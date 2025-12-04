@@ -3,5 +3,5 @@ services:
     build: .
     container_name: lokaly-admin-fe
     ports:
-      - "3001:80"
+      - "80:80"
     restart: always
