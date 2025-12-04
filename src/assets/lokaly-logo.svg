@@ -1,0 +1,28 @@
+<svg width="120" height="32" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ícono de casa premium -->
+  <path 
+    d="M4 10.5L12 4L20 10.5V19C20 19.5523 19.5523 20 19 20H5C4.44772 20 4 19.5523 4 19V10.5Z" 
+    stroke="#D8B25A" 
+    stroke-width="3.0" 
+    stroke-linejoin="round"
+  />
+  <path 
+    d="M10 20V14H14V20" 
+    stroke="#D8B25A" 
+    stroke-width="1.8" 
+    stroke-linecap="round"
+  />
+
+  <!-- Texto Lokaly, más cerca del ícono -->
+  <text
+    x="23"      
+    y="20"       
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif"
+    font-size="18"
+    font-weight="600"
+    letter-spacing="0.4"
+    fill="#D8B25A"
+  >
+    Lokaly
+  </text>
+</svg>
