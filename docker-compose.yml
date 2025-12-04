@@ -1,0 +1,7 @@
+services:
+  lokaly-admin-fe:
+    build: .
+    container_name: lokaly-admin-fe
+    ports:
+      - "3001:80"
+    restart: always
