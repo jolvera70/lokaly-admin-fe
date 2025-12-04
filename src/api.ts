@@ -3,7 +3,7 @@
 const BASE_URL = "http://localhost:8080/api/admin";
 const PUBLIC_BASE_URL = "http://localhost:8080/api/public";
 
-export type PlanKey = "ONE_PRODUCT" | "THREE_PRODUCT" | "TEN_PRODUCTS" | "UNLIMITED";
+export type PlanKey = "ONE_PRODUCT" | "THREE_PRODUCTS" | "TEN_PRODUCTS" | "UNLIMITED";
 
 export type LoginResponse = {
   token: string;
@@ -25,18 +25,28 @@ export type NeighborSignupRequest = {
 
 // Token del ADMIN (panel web)
 function getAdminAuthHeaders() {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };  
   const token = localStorage.getItem("lokaly_admin_token");
   return token
     ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
     : { "Content-Type": "application/json" };
+
+    return headers;
 }
 
 // Token del VECINO (solo para pruebas desde web, en móvil usas SecureStore)
 function getNeighborAuthHeaders() {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };  
   const token = localStorage.getItem("neighbor_token");
   return token
     ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
     : { "Content-Type": "application/json" };
+
+    return headers;
 }
 
 /* =========================
@@ -50,7 +60,7 @@ export type SellerPlanConfig = {
 
 export type SellerPlans = {
   oneProduct: SellerPlanConfig;
-  threeProduct: SellerPlanConfig;
+  threeProducts: SellerPlanConfig;
   tenProducts: SellerPlanConfig;
   unlimited: SellerPlanConfig;
 };

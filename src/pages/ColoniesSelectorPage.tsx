@@ -30,7 +30,7 @@ const ColoniesSelectorPage: React.FC = () => {
   return (
     <section
       style={{
-        maxWidth: 1160, // 💡 más ancho para que quepan 4 columnas
+        maxWidth: 1160,
         margin: "0 auto",
         paddingTop: 8,
         display: "flex",
@@ -88,7 +88,6 @@ const ColoniesSelectorPage: React.FC = () => {
           <div
             style={{
               display: "grid",
-              // 👉 intenta mostrar 4 columnas; si el ancho no alcanza, el navegador reduce el número
               gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
               gap: 20,
               padding: "10px 2px",
@@ -147,7 +146,7 @@ const ColoniesSelectorPage: React.FC = () => {
                     color: "#cfcfcf",
                   }}
                 >
-                  {cluster.city} · {cluster.colonies} colonias
+                  {cluster.city} · {(cluster as any).coloniesCount ?? 0} colonias
                 </div>
               </button>
             ))}

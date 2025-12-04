@@ -3,9 +3,11 @@ import React, { useState } from "react";
 import {
   createSellerCheckout,
   fakeCompleteCheckout,
+  type PlanKey,          // 👈 importamos el type real
 } from "../api";
 
-type SellerPlanKey = "ONE_PRODUCT" | "TREE_PRODUCT" | "TEN_PRODUCTS" | "UNLIMITED";
+// Reutilizamos el tipo del api
+type SellerPlanKey = PlanKey;
 
 type SellerPlanOrder = {
   id: string;
@@ -30,9 +32,16 @@ const SellerCheckoutPage: React.FC = () => {
       setError("Debes iniciar sesión como vecino para comprar un plan.");
       return;
     }
+
+    if (!selectedPlan) {
+      setError("Primero elige un plan de vendedor.");
+      return;
+    }
+
     try {
       setError(null);
       setCreating(true);
+      // 👇 ya no necesitamos cast, SellerPlanKey === PlanKey
       const newOrder = await createSellerCheckout(selectedPlan);
       setOrder(newOrder);
     } catch (e: any) {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { LoginPage } from "./LoginPage";
 import type { LoginSuccessPayload } from "./LoginPage";
 import { AdminLayout } from "./AdminLayout";
