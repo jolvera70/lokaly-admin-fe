@@ -1,7 +1,8 @@
 // src/api.ts
 
-const BASE_URL = "http://lokaly.site:8080/api/admin";
-const PUBLIC_BASE_URL = "http://lokaly.site:8080/api/public";
+export const BASE_URL = "http://lokaly.site:8080/api/admin";
+export const PUBLIC_BASE_URL = "http://lokaly.site:8080/api/public";
+export const PUBLIC_ORIGIN = "http://lokaly.site:8080";
 
 export type PlanKey = "ONE_PRODUCT" | "THREE_PRODUCTS" | "TEN_PRODUCTS" | "UNLIMITED";
 

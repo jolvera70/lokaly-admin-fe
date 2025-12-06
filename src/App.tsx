@@ -1,8 +1,21 @@
 import { useState } from "react";
+
+// Login
 import { LoginPage } from "./LoginPage";
 import type { LoginSuccessPayload } from "./LoginPage";
+
+// Layout administrador
 import { AdminLayout } from "./AdminLayout";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+// Router
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
+// Páginas del admin
 import ColoniesPage from "./pages/ColoniesPage";
 import ClustersPage from "./pages/ClustersPage";
 import ColoniesSelectorPage from "./pages/ColoniesSelectorPage";
@@ -10,6 +23,10 @@ import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
 import SellerCheckoutPage from "./pages/SellerCheckoutPage";
 
+// Pública: catálogo
+import { PublicCatalogPage } from "./pages/public/PublicCatalogPage";
+// Pública: landing nueva
+import { LandingPage } from "./pages/public/LandingPAge";
 
 type AuthState = {
   token: string;
@@ -29,6 +46,10 @@ function App() {
   const [auth, setAuth] = useState<AuthState>(() => loadInitialAuth());
 
   const handleLoginSuccess = (data: LoginSuccessPayload) => {
+    localStorage.setItem("lokaly_admin_token", data.accessToken);
+    localStorage.setItem("lokaly_admin_name", data.name);
+    localStorage.setItem("lokaly_admin_role", data.role);
+
     setAuth({
       token: data.accessToken,
       name: data.name,
@@ -43,24 +64,54 @@ function App() {
     setAuth(null);
   };
 
-  if (!auth) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  }
-
   return (
-  <BrowserRouter>
-    <AdminLayout name={auth.name} onLogout={handleLogout}>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<div>Dashboard (luego lo llenamos)</div>} />
-        <Route path="/clusters" element={<ClustersPage />} />
-        <Route path="/colonies" element={<ColoniesSelectorPage />} />
-        <Route path="/colonies/:clusterId" element={<ColoniesPage />} />
-        <Route path="/signup" element={<NeighborSignupPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/seller/checkout" element={<SellerCheckoutPage />} />
+        {/* 🌐 Landing pública en / */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* 🌐 Ruta pública de catálogo */}
+        <Route path="/catalog/:slug" element={<PublicCatalogPage />} />
+
+        {/* 🔑 Login admin */}
+        <Route
+          path="/login"
+          element={
+            auth ? (
+              <Navigate to="/admin" replace />
+            ) : (
+              <LoginPage onLoginSuccess={handleLoginSuccess} />
+            )
+          }
+        />
+
+        {/* 🔒 Rutas privadas del admin */}
+        <Route
+          path="/admin/*"
+          element={
+            auth ? (
+              <AdminLayout name={auth.name} onLogout={handleLogout}>
+                <Routes>
+                  <Route path="" element={<div>Dashboard</div>} />
+                  <Route path="clusters" element={<ClustersPage />} />
+                  <Route path="colonies" element={<ColoniesSelectorPage />} />
+                  <Route path="colonies/:clusterId" element={<ColoniesPage />} />
+                  <Route path="signup" element={<NeighborSignupPage />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="seller/checkout" element={<SellerCheckoutPage />} />
+                  <Route path="catalog/:slug" element={<PublicCatalogPage />} />
+                </Routes>
+              </AdminLayout>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </AdminLayout>
-  </BrowserRouter>
+    </BrowserRouter>
   );
 }
 
