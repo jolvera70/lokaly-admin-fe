@@ -489,7 +489,7 @@ export function PublicCatalogPage() {
               style={{
                 padding: "6px 10px",
                 borderRadius: 999,
-                border: "1px solid "#FACC15",
+                border: "1px solid",
                 fontSize: 11,
                 fontWeight: 600,
                 backgroundColor: "transparent",
