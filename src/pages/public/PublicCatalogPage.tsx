@@ -8,6 +8,7 @@ type PublicProduct = {
   price: number;
   imageUrls: string[];
   shortDescription?: string;
+  featured?: boolean; // 👈 NUEVO
 };
 
 type PublicSeller = {
@@ -237,6 +238,7 @@ export function PublicCatalogPage() {
             price: p.price,
             imageUrls: resolvedImages,
             shortDescription: p.shortDescription ?? p.description,
+            featured: !!p.featured, // 👈 leemos featured del BE
           };
         }),
       };
@@ -277,8 +279,7 @@ export function PublicCatalogPage() {
 
     const ANDROID_APP_URL =
       "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO
-    const IOS_APP_URL =
-      "https://apps.apple.com/app/idXXXXXXXXXX"; // TODO
+    const IOS_APP_URL = "https://apps.apple.com/app/idXXXXXXXXXX"; // TODO
 
     const ua = navigator.userAgent || "";
     const isIOS = /iPad|iPhone|iPod/.test(ua);
@@ -340,6 +341,14 @@ export function PublicCatalogPage() {
     );
 
   const { seller, products } = data;
+
+  // 👉 Destacados primero (sin romper nada)
+  const sortedProducts = [...products].sort((a, b) => {
+    const fa = a.featured ? 1 : 0;
+    const fb = b.featured ? 1 : 0;
+    if (fb !== fa) return fb - fa; // primero los que tienen featured = true
+    return 0;
+  });
 
   return (
     <div
@@ -480,7 +489,7 @@ export function PublicCatalogPage() {
               style={{
                 padding: "6px 10px",
                 borderRadius: 999,
-                border: "1px solid #FACC15",
+                border: "1px solid "#FACC15",
                 fontSize: 11,
                 fontWeight: 600,
                 backgroundColor: "transparent",
@@ -495,7 +504,7 @@ export function PublicCatalogPage() {
         </section>
 
         {/* ====== GRID DE PRODUCTOS ====== */}
-        {products.length === 0 ? (
+        {sortedProducts.length === 0 ? (
           <p style={{ color: "#6B7280", marginTop: 16 }}>
             Este vendedor todavía no tiene productos activos.
           </p>
@@ -507,7 +516,7 @@ export function PublicCatalogPage() {
               gap: 16,
             }}
           >
-            {products.map((p) => (
+            {sortedProducts.map((p) => (
               <article
                 key={p.id}
                 style={{
@@ -560,20 +569,46 @@ export function PublicCatalogPage() {
                     ${p.price.toLocaleString("es-MX")} MXN
                   </p>
 
-                  <span
+                  {/* Chips: Destacado + Disponible */}
+                  <div
                     style={{
-                      display: "inline-block",
                       marginTop: 2,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: "#16A34A",
-                      backgroundColor: "#DCFCE7",
+                      display: "flex",
+                      gap: 6,
+                      flexWrap: "wrap",
                     }}
                   >
-                    Disponible
-                  </span>
+                    {p.featured && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#92400E",
+                          backgroundColor: "#FEF3C7",
+                          border: "1px solid #FBBF24",
+                        }}
+                      >
+                        Destacado ✨
+                      </span>
+                    )}
+
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        color: "#16A34A",
+                        backgroundColor: "#DCFCE7",
+                      }}
+                    >
+                      Disponible
+                    </span>
+                  </div>
                 </div>
 
                 <button
