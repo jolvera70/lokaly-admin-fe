@@ -48,12 +48,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
         <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <NavItem label="Dashboard" to="/" exact />
-          <NavItem label="Clusters" to="/clusters" />
-          <NavItem label="Colonias" to="/colonies" />
-          <NavItem label="Usuarios" to="/users" />
-          <NavItem label="Ajustes" to="/settings" />
-          <NavItem label="Signup" to="/signup" />
-          <NavItem label="Checkout" to="/checkout" />
+          <NavItem label="Clusters" to="/admin/clusters" />
+          <NavItem label="Colonias" to="/admin/colonies" />
+          <NavItem label="Usuarios" to="/admin/users" />
+          <NavItem label="Ajustes" to="/admin/settings" />
+          <NavItem label="Checkout" to="/admin/checkout" />
         </nav>
 
         <div style={{ flexGrow: 1 }} />
