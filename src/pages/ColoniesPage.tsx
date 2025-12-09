@@ -106,7 +106,7 @@ const ColoniesPage: React.FC = () => {
       <div style={{ padding: 24 }}>
         <p>No se proporcionó clusterId en la URL.</p>
         <button
-          onClick={() => navigate("/colonies")}
+          onClick={() => navigate("/admin/colonies")}
           style={{
             marginTop: 12,
             padding: "8px 14px",

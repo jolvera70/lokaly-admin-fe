@@ -96,7 +96,7 @@ const ColoniesSelectorPage: React.FC = () => {
             {clusters.map((cluster) => (
               <button
                 key={cluster.id}
-                onClick={() => navigate(`/colonies/${cluster.id}`)}
+                onClick={() => navigate(`/admin/colonies/${cluster.id}`)}
                 style={{
                   textAlign: "left",
                   padding: "20px",
