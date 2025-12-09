@@ -11,7 +11,7 @@ type LoginPageProps = {
     onLoginSuccess: (data: LoginSuccessPayload) => void;
 };
 
-const API_URL = "http://lokaly.site:8080/api/admin/auth/login";
+const API_URL = "http://lokaly.site/api/admin/auth/login";
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState("");
