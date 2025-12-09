@@ -156,7 +156,7 @@ const ColoniesPage: React.FC = () => {
         </div>
 
         <button
-          onClick={() => navigate("/colonies")}
+          onClick={() => navigate("/admin/colonies")}
           style={{
             padding: "7px 14px",
             borderRadius: 999,
