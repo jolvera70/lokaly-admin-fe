@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useState } from "react";
 
 // Login
@@ -13,6 +14,7 @@ import {
   Routes,
   Route,
   Navigate,
+  Outlet,
 } from "react-router-dom";
 
 // Páginas del admin
@@ -42,6 +44,25 @@ function loadInitialAuth(): AuthState {
   return { token, name, role };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+function AdminShell({
+  auth,
+  onLogout,
+}: {
+  auth: AuthState;
+  onLogout: () => void;
+}) {
+  if (!auth) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <AdminLayout name={auth.name} onLogout={onLogout}>
+      <Outlet />
+    </AdminLayout>
+  );
+}
+
 function App() {
   const [auth, setAuth] = useState<AuthState>(() => loadInitialAuth());
 
@@ -67,7 +88,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 🌐 Landing pública en / */}
+        {/* 🌐 Landing pública */}
         <Route path="/" element={<LandingPage />} />
 
         {/* 🌐 Ruta pública de catálogo */}
@@ -85,28 +106,28 @@ function App() {
           }
         />
 
-        {/* 🔒 Rutas privadas del admin */}
+        {/* 🔒 Rutas protegidas admin */}
         <Route
-          path="/admin/*"
-          element={
-            auth ? (
-              <AdminLayout name={auth.name} onLogout={handleLogout}>
-                <Routes>
-                  <Route path="" element={<div>Dashboard</div>} />
-                  <Route path="clusters" element={<ClustersPage />} />
-                  <Route path="colonies" element={<ColoniesSelectorPage />} />
-                  <Route path="colonies/:clusterId" element={<ColoniesPage />} />
-                  <Route path="signup" element={<NeighborSignupPage />} />
-                  <Route path="users" element={<UsersPage />} />
-                  <Route path="seller/checkout" element={<SellerCheckoutPage />} />
-                  <Route path="catalog/:slug" element={<PublicCatalogPage />} />
-                </Routes>
-              </AdminLayout>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+          element={<AdminShell auth={auth} onLogout={handleLogout} />}
+        >
+          <Route path="/admin" element={<div>Dashboard</div>} />
+          <Route path="/admin/clusters" element={<ClustersPage />} />
+          <Route path="/admin/colonies" element={<ColoniesSelectorPage />} />
+          <Route
+            path="/admin/colonies/:clusterId"
+            element={<ColoniesPage />}
+          />
+          <Route path="/admin/signup" element={<NeighborSignupPage />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route
+            path="/admin/seller/checkout"
+            element={<SellerCheckoutPage />}
+          />
+          <Route
+            path="/admin/catalog/:slug"
+            element={<PublicCatalogPage />}
+          />
+        </Route>
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
