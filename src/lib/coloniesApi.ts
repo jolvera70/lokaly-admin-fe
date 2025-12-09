@@ -1,6 +1,6 @@
 // src/lib/coloniesApi.ts
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://lokaly.site";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://lokaly.site";
 
 export type Colony = {
   id: string;
