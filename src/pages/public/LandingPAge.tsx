@@ -8,7 +8,7 @@ const MOCK_IMAGES = [
 ];
 
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80"; // mercado / productos
+  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80";
 
 export function LandingPage() {
   return (
@@ -69,141 +69,251 @@ export function LandingPage() {
                   color: "#6B7280",
                 }}
               >
-                Compra y vende en tu comunidad
+                Catálogos para vender entre vecinos
               </div>
             </div>
           </div>
 
-          <Link
-            to="/login"
+          <nav
             style={{
-              fontSize: 13,
-              color: "#4B5563",
-              textDecoration: "none",
-              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              fontSize: 12,
             }}
           >
-            Iniciar sesión
-          </Link>
+            <a
+              href="#beneficios"
+              style={{
+                color: "#4B5563",
+                textDecoration: "none",
+              }}
+            >
+              Beneficios
+            </a>
+            <a
+              href="#como-funciona"
+              style={{
+                color: "#4B5563",
+                textDecoration: "none",
+              }}
+            >
+              Cómo funciona
+            </a>
+
+            <Link
+              to="/login"
+              style={{
+                fontSize: 13,
+                color: "#111827",
+                textDecoration: "none",
+                fontWeight: 600,
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "1px solid #D1D5DB",
+                backgroundColor: "#FFFFFF",
+              }}
+            >
+              Iniciar sesión
+            </Link>
+          </nav>
         </header>
 
         {/* Hero */}
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)",
+            gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
             gap: 32,
             alignItems: "center",
           }}
         >
           {/* Texto principal */}
           <div>
-            <p
+            {/* Badge contextual (vienen de un catálogo público) */}
+            <div
               style={{
-                margin: 0,
-                fontSize: 13,
-                textTransform: "uppercase",
-                letterSpacing: 2,
-                color: "#6B7280",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "4px 10px",
+                borderRadius: 999,
+                backgroundColor: "#FEF3C7",
+                color: "#92400E",
+                fontSize: 11,
+                fontWeight: 600,
+                marginBottom: 8,
               }}
             >
-              TU MERCADO ENTRE VECINOS
-            </p>
+              <span
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 999,
+                  backgroundColor: "#FACC15",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  color: "#111827",
+                }}
+              >
+                ★
+              </span>
+              <span>Viste un catálogo creado con Lokaly</span>
+            </div>
+
             <h1
               style={{
-                margin: "8px 0 8px 0",
+                margin: "6px 0 10px 0",
                 fontSize: 34,
                 fontWeight: 800,
+                lineHeight: 1.1,
               }}
             >
-              Explora y comparte productos
+              Crea tu catálogo
               <br />
-              en tu comunidad.
+              y vende en tu colonia.
             </h1>
+
             <p
               style={{
-                margin: "0 0 18px 0",
+                margin: "0 0 14px 0",
                 fontSize: 15,
                 color: "#4B5563",
               }}
             >
-              Lokaly conecta a vecinos, servicios y pequeños negocios para que
-              puedan comprar y vender de forma segura dentro de su colonia o
-              residencial.
+              Lokaly te ayuda a mostrar tus productos con un catálogo elegante,
+              compartir tu link por WhatsApp y recibir pedidos de tus vecinos
+              sin complicarte con tiendas en línea complejas.
             </p>
 
-<div
-  style={{
-    display: "flex",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 12,
-  }}
->
-  {/* Botón App Store */}
-  <a
-    href="https://apps.apple.com/app/idXXXXXXXXX" // TODO: reemplaza con tu ID real
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      padding: "10px 18px",
-      borderRadius: 12,
-      backgroundColor: "#111827",
-      color: "#fff",
-      fontSize: 14,
-      fontWeight: 600,
-      textDecoration: "none",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    }}
-  >
-    🍎 Descargar en App Store
-  </a>
+            <ul
+              style={{
+                margin: "0 0 18px 0",
+                paddingLeft: 18,
+                fontSize: 13,
+                color: "#4B5563",
+              }}
+            >
+              <li>Publica tus productos desde la app en minutos.</li>
+              <li>Comparte tu catálogo con un solo link.</li>
+              <li>Vende solo en tu colonia o residencial.</li>
+            </ul>
 
-  {/* Botón Google Play */}
-  <a
-    href="https://play.google.com/store/apps/details?id=com.tuempresa.lokaly" // TODO
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      padding: "10px 18px",
-      borderRadius: 12,
-      backgroundColor: "#111827",
-      color: "#fff",
-      fontSize: 14,
-      fontWeight: 600,
-      textDecoration: "none",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    }}
-  >
-    🤖 Descargar en Google Play
-  </a>
-</div>
+            {/* CTA principal */}
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: 12,
+              }}
+            >
+              <Link
+                to="/login"
+                style={{
+                  padding: "11px 20px",
+                  borderRadius: 999,
+                  backgroundColor: "#111827",
+                  color: "#FACC15",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  boxShadow:
+                    "0 14px 28px rgba(15,23,42,0.35), 0 3px 6px rgba(0,0,0,0.25)",
+                }}
+              >
+                Crear mi catálogo ahora
+                <span style={{ fontSize: 16 }}>→</span>
+              </Link>
 
-<p
-  style={{
-    fontSize: 12,
-    color: "#6B7280",
-  }}
->
-  ¿Ya tienes la app? Pide a tus vecinos que compartan su catálogo público de Lokaly.
-</p>
+              <a
+                href="#como-funciona"
+                style={{
+                  padding: "11px 18px",
+                  borderRadius: 999,
+                  border: "1px solid #D1D5DB",
+                  backgroundColor: "#FFFFFF",
+                  color: "#111827",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                Ver cómo funciona
+              </a>
+            </div>
+
+            {/* Botones de tienda */}
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: 10,
+              }}
+            >
+              {/* App Store */}
+              <a
+                href="https://apps.apple.com/app/idXXXXXXXXX" // TODO: reemplaza con tu ID real
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 12,
+                  backgroundColor: "#111827",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                🍎 Descargar en App Store
+              </a>
+
+              {/* Google Play */}
+              <a
+                href="https://play.google.com/store/apps/details?id=com.tuempresa.lokaly" // TODO
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 12,
+                  backgroundColor: "#111827",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                🤖 Descargar en Google Play
+              </a>
+            </div>
 
             <p
               style={{
-                fontSize: 12,
+                fontSize: 11,
                 color: "#6B7280",
               }}
             >
-              ¿Ya tienes la app? Pide a tus vecinos que compartan su catálogo
-              público de Lokaly.
+              ¿Ya tienes la app? Inicia sesión y crea tu catálogo desde Lokaly.
             </p>
           </div>
 
-          {/* Mockup: mini feed tipo home de la app, ahora con imágenes */}
+          {/* Mockup tipo app: catálogo en el vecindario */}
           <div
             style={{
               borderRadius: 32,
@@ -251,7 +361,7 @@ export function LandingPage() {
                     marginBottom: 2,
                   }}
                 >
-                  Lombardia Residencial
+                  Catálogo público · Lokaly
                 </div>
                 <div
                   style={{
@@ -259,7 +369,7 @@ export function LandingPage() {
                     color: "#6B7280",
                   }}
                 >
-                  En tu comunidad
+                  Ejemplo de cómo se ve tu tienda para los vecinos
                 </div>
               </div>
             </div>
@@ -294,7 +404,7 @@ export function LandingPage() {
                     marginBottom: 2,
                   }}
                 >
-                  Explora tu comunidad
+                  Tu catálogo para compartir
                 </div>
                 <div
                   style={{
@@ -302,12 +412,12 @@ export function LandingPage() {
                     color: "#6B7280",
                   }}
                 >
-                  Descubre productos publicados por tus vecinos en Lokaly.
+                  Copia el link y compártelo por WhatsApp, grupos o redes.
                 </div>
               </div>
             </div>
 
-            {/* Grid de “productos ejemplo” con imágenes de referencia */}
+            {/* Grid de productos ejemplo */}
             <div
               style={{
                 display: "grid",
@@ -316,10 +426,10 @@ export function LandingPage() {
               }}
             >
               {[
-                { name: "Laptop", price: "$2,000 MXN" },
-                { name: "Comedor", price: "$10,000 MXN" },
-                { name: "Sudadera", price: "$200 MXN" },
-                { name: "Acccesorio Gym", price: "$4,500 MXN" },
+                { name: "Pasteles personalizados", price: "$250 MXN" },
+                { name: "Clases de regularización", price: "$120 MXN" },
+                { name: "Servicios de plomería", price: "$400 MXN" },
+                { name: "Accesorios y ropa", price: "Desde $150 MXN" },
               ].map((item, idx) => (
                 <div
                   key={idx}
@@ -371,6 +481,132 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* Beneficios principales */}
+        <section
+          id="beneficios"
+          style={{
+            marginTop: 40,
+          }}
+        >
+          <h2
+            style={{
+              margin: "0 0 12px 0",
+              fontSize: 20,
+              fontWeight: 700,
+            }}
+          >
+            Pensado para quienes venden en su colonia
+          </h2>
+          <p
+            style={{
+              margin: "0 0 18px 0",
+              fontSize: 14,
+              color: "#4B5563",
+            }}
+          >
+            Lokaly es ideal para negocios pequeños, emprendedores y vecinos que
+            venden desde casa y quieren verse profesionales sin complicarse.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 16,
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 18,
+                backgroundColor: "#FFFFFF",
+                padding: 14,
+                boxShadow: "0 10px 18px rgba(15,23,42,0.05)",
+              }}
+            >
+              <div style={{ fontSize: 20, marginBottom: 6 }}>📲</div>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                Un solo link para todo
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: "#4B5563",
+                }}
+              >
+                Comparte tu catálogo en WhatsApp, grupos de vecinos y redes sin
+                mandar fotos una por una.
+              </p>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 18,
+                backgroundColor: "#FFFFFF",
+                padding: 14,
+                boxShadow: "0 10px 18px rgba(15,23,42,0.05)",
+              }}
+            >
+              <div style={{ fontSize: 20, marginBottom: 6 }}>🏘️</div>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                Vende cerca de ti
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: "#4B5563",
+                }}
+              >
+                Diseñado para residenciales, privadas y colonias: vende donde ya
+                tienes confianza.
+              </p>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 18,
+                backgroundColor: "#FFFFFF",
+                padding: 14,
+                boxShadow: "0 10px 18px rgba(15,23,42,0.05)",
+              }}
+            >
+              <div style={{ fontSize: 20, marginBottom: 6 }}>⚡</div>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                Fácil y rápido
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: "#4B5563",
+                }}
+              >
+                No necesitas saber de tiendas en línea. Solo sube fotos, precio
+                y descripción desde la app.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Sección “cómo funciona” */}
         <section
           id="como-funciona"
@@ -387,21 +623,140 @@ export function LandingPage() {
               fontWeight: 700,
             }}
           >
-            ¿Cómo funciona Lokaly?
+            Crea tu catálogo en 4 pasos
           </h2>
-          <ol
+
+          <div
             style={{
-              margin: 0,
-              paddingLeft: 18,
-              fontSize: 14,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+              gap: 14,
+              fontSize: 13,
               color: "#4B5563",
             }}
           >
-            <li>Registra tu colonia o residencial.</li>
-            <li>Invita a tus vecinos a unirse.</li>
-            <li>Publica productos o servicios.</li>
-            <li>Coordina la entrega directamente por chat.</li>
-          </ol>
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#9CA3AF",
+                  marginBottom: 2,
+                }}
+              >
+                PASO 1
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  marginBottom: 3,
+                }}
+              >
+                Crea tu cuenta
+              </div>
+              <p style={{ margin: 0 }}>
+                Entra a Lokaly desde la app o web e inicia sesión.
+              </p>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#9CA3AF",
+                  marginBottom: 2,
+                }}
+              >
+                PASO 2
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  marginBottom: 3,
+                }}
+              >
+                Registra tu colonia
+              </div>
+              <p style={{ margin: 0 }}>
+                Indica en qué residencial o colonia vendes para llegar a tus
+                vecinos.
+              </p>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#9CA3AF",
+                  marginBottom: 2,
+                }}
+              >
+                PASO 3
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  marginBottom: 3,
+                }}
+              >
+                Publica tus productos
+              </div>
+              <p style={{ margin: 0 }}>
+                Sube fotos, precios y descripciones desde la app Lokaly.
+              </p>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#9CA3AF",
+                  marginBottom: 2,
+                }}
+              >
+                PASO 4
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  marginBottom: 3,
+                }}
+              >
+                Comparte tu link
+              </div>
+              <p style={{ margin: 0 }}>
+                Envía tu catálogo por WhatsApp, grupos de vecinos o redes y
+                recibe pedidos.
+              </p>
+            </div>
+          </div>
+
+          {/* CTA repetido abajo */}
+          <div
+            style={{
+              marginTop: 20,
+              textAlign: "center",
+            }}
+          >
+            <Link
+              to="/login"
+              style={{
+                display: "inline-flex",
+                padding: "10px 20px",
+                borderRadius: 999,
+                backgroundColor: "#111827",
+                color: "#FACC15",
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: "none",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              Empezar mi catálogo en Lokaly
+              <span>✨</span>
+            </Link>
+          </div>
         </section>
 
         <footer

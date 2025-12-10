@@ -413,7 +413,7 @@ function LokalyPromoSection({ clusterName }: LokalyPromoSectionProps) {
             backgroundColor: "rgba(15,23,42,0.85)",
           }}
         >
-          🏘️ Vende solo entre vecinos
+          🏘️ Vende solo entre vecinos o ciudad tu decides
         </div>
       </div>
 
