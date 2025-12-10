@@ -112,23 +112,6 @@ export function LandingPage() {
             >
               Cómo funciona
             </a>
-
-            {/* Login solo para admin (clarito) */}
-            <Link
-              to="/login"
-              style={{
-                fontSize: 11,
-                color: "#6B7280",
-                textDecoration: "none",
-                fontWeight: 500,
-                padding: "4px 10px",
-                borderRadius: 999,
-                border: "1px dashed #D1D5DB",
-                backgroundColor: "#F9FAFB",
-              }}
-            >
-              Panel admin
-            </Link>
           </nav>
         </header>
 
