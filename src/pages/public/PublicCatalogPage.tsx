@@ -26,6 +26,13 @@ type PublicCatalogResponse = {
   products: PublicProduct[];
 };
 
+/* ====== URLs Lokaly (ajusta cuando estén listas) ====== */
+
+const ANDROID_APP_URL =
+  "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO: reemplazar
+const IOS_APP_URL = "https://apps.apple.com/app/idXXXXXXXXXX"; // TODO: reemplazar
+const LANDING_URL = "https://lokaly.site"; // TODO: si cambias dominio, ajusta aquí
+
 function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
 
@@ -37,7 +44,7 @@ function resolveImageUrl(rawUrl?: string | null): string | undefined {
   return `${PUBLIC_ORIGIN}${path}`;
 }
 
-/* ========= Carrusel de imágenes por producto ========= */
+/* ========= Carrusel de imágenes por producto con zoom ========= */
 
 type ProductImageCarouselProps = {
   images: string[];
@@ -46,6 +53,7 @@ type ProductImageCarouselProps = {
 
 function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
   const [index, setIndex] = useState(0);
+  const [isOpen, setIsOpen] = useState(false); // 👈 modal abierto/cerrado
 
   if (!images || images.length === 0) return null;
 
@@ -64,112 +72,402 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
   const current = images[index];
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        borderRadius: 18,
-        overflow: "hidden",
-        marginBottom: 10,
-        backgroundColor: "#E5E7EB",
-      }}
-    >
-      <img
-        src={current}
-        alt={alt}
+    <>
+      {/* Carrusel normal en la tarjeta */}
+      <div
         style={{
+          position: "relative",
           width: "100%",
-          height: 190,
-          objectFit: "cover",
-          display: "block",
+          borderRadius: 18,
+          overflow: "hidden",
+          marginBottom: 10,
+          backgroundColor: "#E5E7EB",
         }}
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.display = "none";
-        }}
-      />
-
-      {/* Flechas solo si hay más de una imagen */}
-      {total > 1 && (
-        <>
-          <button
-            onClick={goPrev}
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: 10,
-              transform: "translateY(-50%)",
-              width: 26,
-              height: 26,
-              borderRadius: "999px",
-              border: "none",
-              backgroundColor: "rgba(17,24,39,0.55)",
-              color: "#F9FAFB",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              fontSize: 16,
-            }}
-          >
-            ‹
-          </button>
-
-          <button
-            onClick={goNext}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: 10,
-              transform: "translateY(-50%)",
-              width: 26,
-              height: 26,
-              borderRadius: "999px",
-              border: "none",
-              backgroundColor: "rgba(17,24,39,0.55)",
-              color: "#F9FAFB",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              fontSize: 16,
-            }}
-          >
-            ›
-          </button>
-        </>
-      )}
-
-      {/* Dots */}
-      {total > 1 && (
+      >
         <div
+          onClick={() => setIsOpen(true)}
           style={{
-            position: "absolute",
-            bottom: 8,
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            gap: 5,
-            padding: "4px 8px",
-            borderRadius: 999,
-            backgroundColor: "rgba(17,24,39,0.5)",
+            cursor: "zoom-in",
           }}
         >
-          {images.map((_, i) => (
-            <div
-              key={i}
+          <img
+            src={current}
+            alt={alt}
+            style={{
+              width: "100%",
+              height: 190,
+              objectFit: "cover",
+              display: "block",
+            }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </div>
+
+        {/* Flechas solo si hay más de una imagen */}
+        {total > 1 && (
+          <>
+            <button
+              onClick={goPrev}
               style={{
-                width: i === index ? 10 : 6,
-                height: 6,
-                borderRadius: 999,
-                backgroundColor:
-                  i === index ? "#FACC15" : "rgba(249,250,251,0.6)",
-                transition: "all 0.2s ease",
+                position: "absolute",
+                top: "50%",
+                left: 10,
+                transform: "translateY(-50%)",
+                width: 26,
+                height: 26,
+                borderRadius: "999px",
+                border: "none",
+                backgroundColor: "rgba(17,24,39,0.55)",
+                color: "#F9FAFB",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                fontSize: 16,
+              }}
+            >
+              ‹
+            </button>
+
+            <button
+              onClick={goNext}
+              style={{
+                position: "absolute",
+                top: "50%",
+                right: 10,
+                transform: "translateY(-50%)",
+                width: 26,
+                height: 26,
+                borderRadius: "999px",
+                border: "none",
+                backgroundColor: "rgba(17,24,39,0.55)",
+                color: "#F9FAFB",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                fontSize: 16,
+              }}
+            >
+              ›
+            </button>
+          </>
+        )}
+
+        {/* Dots */}
+        {total > 1 && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              gap: 5,
+              padding: "4px 8px",
+              borderRadius: 999,
+              backgroundColor: "rgba(17,24,39,0.5)",
+            }}
+          >
+            {images.map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: i === index ? 10 : 6,
+                  height: 6,
+                  borderRadius: 999,
+                  backgroundColor:
+                    i === index ? "#FACC15" : "rgba(249,250,251,0.6)",
+                  transition: "all 0.2s ease",
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal de zoom */}
+      {isOpen && (
+        <div
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            backgroundColor: "rgba(15,23,42,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "relative",
+              maxWidth: "min(900px, 100%)",
+              maxHeight: "90vh",
+              width: "100%",
+            }}
+          >
+            <img
+              src={current}
+              alt={alt}
+              style={{
+                width: "100%",
+                maxHeight: "90vh",
+                objectFit: "contain",
+                borderRadius: 18,
+                backgroundColor: "#000",
               }}
             />
-          ))}
+
+            {/* Botón cerrar */}
+            <button
+              onClick={() => setIsOpen(false)}
+              style={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                border: "none",
+                backgroundColor: "rgba(15,23,42,0.9)",
+                color: "#F9FAFB",
+                fontSize: 18,
+                cursor: "pointer",
+              }}
+            >
+              ✕
+            </button>
+
+            {/* Flechas dentro del modal */}
+            {total > 1 && (
+              <>
+                <button
+                  onClick={goPrev}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: 10,
+                    transform: "translateY(-50%)",
+                    width: 36,
+                    height: 36,
+                    borderRadius: 999,
+                    border: "none",
+                    backgroundColor: "rgba(15,23,42,0.9)",
+                    color: "#F9FAFB",
+                    fontSize: 20,
+                    cursor: "pointer",
+                  }}
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={goNext}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    right: 10,
+                    transform: "translateY(-50%)",
+                    width: 36,
+                    height: 36,
+                    borderRadius: 999,
+                    border: "none",
+                    backgroundColor: "rgba(15,23,42,0.9)",
+                    color: "#F9FAFB",
+                    fontSize: 20,
+                    cursor: "pointer",
+                  }}
+                >
+                  ›
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </>
+  );
+}
+
+/* ========= Sección promo Lokaly (gancho) ========= */
+
+type LokalyPromoSectionProps = {
+  clusterName?: string;
+};
+
+function LokalyPromoSection({ clusterName }: LokalyPromoSectionProps) {
+  return (
+    <section
+      style={{
+        marginTop: 32,
+        marginBottom: 24,
+        borderRadius: 24,
+        background:
+          "linear-gradient(135deg, #111827 0%, #020617 40%, #1E293B 100%)",
+        color: "#F9FAFB",
+        padding: "18px 18px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 11,
+          padding: "4px 10px",
+          borderRadius: 999,
+          backgroundColor: "rgba(15,23,42,0.8)",
+          border: "1px solid rgba(148,163,184,0.4)",
+          width: "fit-content",
+        }}
+      >
+        <span
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 999,
+            backgroundColor: "#FACC15",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+            color: "#111827",
+            fontWeight: 700,
+          }}
+        >
+          L
+        </span>
+        <span>Catálogo creado con Lokaly</span>
+      </div>
+
+      <div>
+        <h2
+          style={{
+            margin: "4px 0 4px",
+            fontSize: 18,
+            fontWeight: 800,
+          }}
+        >
+          ¿Quieres un catálogo como este para tus ventas?
+        </h2>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: "#E5E7EB",
+          }}
+        >
+          Crea tu tienda en Lokaly, comparte tu link por WhatsApp y vende a tus
+          vecinos en{" "}
+          <strong>
+            {clusterName ? clusterName.toLowerCase() : "tu colonia"}
+          </strong>{" "}
+          sin complicarte.
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          fontSize: 12,
+          color: "#E5E7EB",
+        }}
+      >
+        <div
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: "1px solid rgba(148,163,184,0.6)",
+            backgroundColor: "rgba(15,23,42,0.85)",
+          }}
+        >
+          ✅ Catálogo listo en minutos
+        </div>
+        <div
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: "1px solid rgba(148,163,184,0.6)",
+            backgroundColor: "rgba(15,23,42,0.85)",
+          }}
+        >
+          📲 Comparte tu link por WhatsApp
+        </div>
+        <div
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: "1px solid rgba(148,163,184,0.6)",
+            backgroundColor: "rgba(15,23,42,0.85)",
+          }}
+        >
+          🏘️ Vende solo entre vecinos
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          marginTop: 2,
+        }}
+      >
+        <button
+          onClick={() => {
+            window.location.href = LANDING_URL;
+          }}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 999,
+            border: "none",
+            fontSize: 12,
+            fontWeight: 700,
+            backgroundColor: "#FACC15",
+            color: "#111827",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Quiero vender en Lokaly
+        </button>
+        <button
+          onClick={() => {
+            // Por ahora manda al sitio; cuando tengas las tiendas puedes hacer deep link
+            const ua = navigator.userAgent || "";
+            const isIOS = /iPad|iPhone|iPod/.test(ua);
+            const storeUrl = isIOS ? IOS_APP_URL : ANDROID_APP_URL;
+            window.location.href = storeUrl;
+          }}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 999,
+            border: "1px solid rgba(249,250,251,0.6)",
+            fontSize: 12,
+            fontWeight: 600,
+            backgroundColor: "transparent",
+            color: "#F9FAFB",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Descargar app Lokaly
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -277,10 +575,6 @@ export function PublicCatalogPage() {
 
     const schemeUrl = `lokaly://${path}`;
 
-    const ANDROID_APP_URL =
-      "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO
-    const IOS_APP_URL = "https://apps.apple.com/app/idXXXXXXXXXX"; // TODO
-
     const ua = navigator.userAgent || "";
     const isIOS = /iPad|iPhone|iPod/.test(ua);
     const storeUrl = isIOS ? IOS_APP_URL : ANDROID_APP_URL;
@@ -369,47 +663,67 @@ export function PublicCatalogPage() {
             alignItems: "center",
             gap: 12,
             marginBottom: 24,
+            justifyContent: "space-between",
           }}
         >
-          <div
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: "#111827",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span
+                style={{
+                  color: "#FACC15",
+                  fontSize: 22,
+                }}
+              >
+                ⌂
+              </span>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  lineHeight: 1.1,
+                }}
+              >
+                Lokaly
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#6B7280",
+                }}
+              >
+                {seller.clusterName || "Tu comunidad"}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => (window.location.href = LANDING_URL)}
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: "#111827",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              padding: "6px 10px",
+              borderRadius: 999,
+              border: "1px solid #D1D5DB",
+              backgroundColor: "#FFFFFF",
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#374151",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
             }}
           >
-            <span
-              style={{
-                color: "#FACC15",
-                fontSize: 22,
-              }}
-            >
-              ⌂
-            </span>
-          </div>
-          <div>
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 18,
-                lineHeight: 1.1,
-              }}
-            >
-              Lokaly
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "#6B7280",
-              }}
-            >
-              {seller.clusterName || "Tu comunidad"}
-            </div>
-          </div>
+            ¿También vendes aquí?
+          </button>
         </header>
 
         {/* ====== HERO EXPLORAR ====== */}
@@ -434,7 +748,7 @@ export function PublicCatalogPage() {
           </p>
         </section>
 
-        {/* ====== CTA ====== */}
+        {/* ====== CTA COMPRADOR ====== */}
         <section
           style={{
             marginBottom: 20,
@@ -633,10 +947,13 @@ export function PublicCatalogPage() {
           </section>
         )}
 
+        {/* ====== SECCIÓN PROMO LOKALY (GANCHO PARA NUEVOS VENDEDORES) ====== */}
+        <LokalyPromoSection clusterName={seller.clusterName} />
+
         <footer
           style={{
             textAlign: "center",
-            marginTop: 32,
+            marginTop: 16,
             color: "#9CA3AF",
             fontSize: 11,
           }}
