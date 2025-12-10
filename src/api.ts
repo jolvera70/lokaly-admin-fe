@@ -4,7 +4,7 @@ export const BASE_URL = "https://lokaly.site/api/admin";
 export const PUBLIC_BASE_URL = "https://lokaly.site/api/public";
 export const PUBLIC_ORIGIN = "https://lokaly.site";
 
-export type PlanKey = "ONE_PRODUCT" | "THREE_PRODUCTS" | "TEN_PRODUCTS" | "UNLIMITED";
+export type PlanKey = "ONE_PRODUCT" | "THREE_PRODUCTS" | "TEN_PRODUCTS" | "FORTY_PRODUCTS";
 
 export type LoginResponse = {
   token: string;
@@ -63,7 +63,7 @@ export type SellerPlans = {
   oneProduct: SellerPlanConfig;
   threeProducts: SellerPlanConfig;
   tenProducts: SellerPlanConfig;
-  unlimited: SellerPlanConfig;
+  fortyProducts: SellerPlanConfig;
 };
 
 /* =========================
@@ -190,17 +190,43 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
   return await res.json();
 }
 
+export type AdminStats = {
+  totalUsers: number;
+  totalSellers: number;
+  totalProducts: number;
+  totalSales: number;
+  totalProductViews: number;
+  totalCatalogViews: number;
+  activeSellersLast7Days: number;
+  newUsersLast7Days: number;
+};
+
+
+// Ejemplo de UserSummary extendido
 export type UserSummary = {
   id: string;
-  fullName: string;
+  fullName?: string;
   email: string;
-  role: "SUPERADMIN" | "VECINO";
+  colonyName?: string;
+  colonyId?: string;
+  role: string;
   seller: boolean;
-  sellerPlanKey?: string | null;
-  colonyId?: string | null;
-  colonyName?: string | null;
-  createdAt?: string;
+  sellerPlanKey?: "ONE_PRODUCT" | "TRHEE_PRODUCTS" | "TEN_PRODUCTS" | "FORTY_PRODUCTS" | null;
+
+  // 📊 NUEVOS CAMPOS (llenados por el backend)
+  productCount?: number;      // cantidad de productos publicados
+  productViews?: number;      // vistas totales de productos
+  catalogViews?: number;      // vistas del catálogo público
+  salesCount?: number;        // número de ventas
 };
+
+export async function fetchAdminStats(): Promise<AdminStats> {
+  const res = await fetch("/api/admin/stats"); // ajusta a tu ruta real
+  if (!res.ok) {
+    throw new Error("No se pudieron cargar las estadísticas");
+  }
+  return res.json();
+}
 
 export async function fetchUsers(): Promise<UserSummary[]> {
   const res = await fetch(`${BASE_URL}/users`, {

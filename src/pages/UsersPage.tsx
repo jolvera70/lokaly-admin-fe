@@ -10,7 +10,7 @@ const UsersPage: React.FC = () => {
   const [view, setView] = useState<"list" | "detail">("list");
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<
-    "ONE_PRODUCT" | "TEN_PRODUCTS" | "UNLIMITED"
+    "ONE_PRODUCT" | "TEN_PRODUCTS" | "FORTY_PRODUCTS"
   >("ONE_PRODUCT");
   const [saving, setSaving] = useState(false);
 
@@ -33,9 +33,7 @@ const UsersPage: React.FC = () => {
 
   const openDetail = (u: UserSummary) => {
     setSelectedUser(u);
-    setSelectedPlan(
-      (u.sellerPlanKey as any) || "ONE_PRODUCT"
-    );
+    setSelectedPlan((u.sellerPlanKey as any) || "ONE_PRODUCT");
     setView("detail");
   };
 
@@ -54,9 +52,7 @@ const UsersPage: React.FC = () => {
       // refrescamos lista y estado local
       await loadUsers();
       setSelectedUser((prev) =>
-        prev
-          ? { ...prev, seller: true, sellerPlanKey: selectedPlan }
-          : prev
+        prev ? { ...prev, seller: true, sellerPlanKey: selectedPlan } : prev
       );
     } catch (e: any) {
       console.error(e);
@@ -88,7 +84,8 @@ const UsersPage: React.FC = () => {
                 color: "#9b9b9b",
               }}
             >
-              Vecinos registrados en el sistema.
+              Vecinos registrados en el sistema. Aquí puedes ver sus planes y
+              activar vendedores.
             </p>
           </div>
         </section>
@@ -120,6 +117,10 @@ const UsersPage: React.FC = () => {
                 <Th>Colonia</Th>
                 <Th>Rol</Th>
                 <Th>Vendedor</Th>
+                {/* 📊 nuevas columnas globales rápidas */}
+                <Th>Productos</Th>
+                <Th>Vistas</Th>
+                <Th>Ventas</Th>
                 <Th style={{ textAlign: "right", paddingRight: 20 }}>
                   Opciones
                 </Th>
@@ -128,15 +129,15 @@ const UsersPage: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <Td colSpan={6}>Cargando...</Td>
+                  <Td colSpan={9}>Cargando...</Td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <Td colSpan={6}>{error}</Td>
+                  <Td colSpan={9}>{error}</Td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <Td colSpan={6}>No hay usuarios registrados.</Td>
+                  <Td colSpan={9}>No hay usuarios registrados.</Td>
                 </tr>
               ) : (
                 users.map((u) => (
@@ -151,6 +152,9 @@ const UsersPage: React.FC = () => {
                     <Td>{u.colonyName || u.colonyId || "—"}</Td>
                     <Td>{u.role}</Td>
                     <Td>{u.seller ? "Sí" : "No"}</Td>
+                    <Td>{u.productCount ?? "—"}</Td>
+                    <Td>{u.productViews ?? "—"}</Td>
+                    <Td>{u.salesCount ?? "—"}</Td>
                     <Td
                       style={{
                         textAlign: "right",
@@ -211,6 +215,7 @@ const UsersPage: React.FC = () => {
 
       {selectedUser && (
         <>
+          {/* Encabezado usuario */}
           <div>
             <h2 style={{ margin: 0, fontSize: 22, fontWeight: 500 }}>
               {selectedUser.fullName || selectedUser.email}
@@ -223,10 +228,13 @@ const UsersPage: React.FC = () => {
               }}
             >
               {selectedUser.email} · {selectedUser.role} ·{" "}
-              {selectedUser.colonyName || selectedUser.colonyId || "Sin colonia"}
+              {selectedUser.colonyName ||
+                selectedUser.colonyId ||
+                "Sin colonia"}
             </p>
           </div>
 
+          {/* Tarjetas de info básica */}
           <div
             style={{
               display: "flex",
@@ -245,6 +253,100 @@ const UsersPage: React.FC = () => {
             />
           </div>
 
+          {/* 📊 REPORTE OPERATIVO DEL USUARIO */}
+          <div
+            style={{
+              marginTop: 4,
+              padding: 14,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.09)",
+              background: "rgba(8,8,8,0.95)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  fontWeight: 500,
+                }}
+              >
+                Reporte de operación del vendedor
+              </h3>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "#9b9b9b",
+                }}
+              >
+                Vista similar a “Mis estadísticas” pero para admin.
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <StatCard
+                label="Productos publicados"
+                value={
+                  selectedUser.productCount !== undefined
+                    ? selectedUser.productCount.toString()
+                    : "—"
+                }
+              />
+              <StatCard
+                label="Vistas de productos"
+                value={
+                  selectedUser.productViews !== undefined
+                    ? selectedUser.productViews.toString()
+                    : "—"
+                }
+              />
+              <StatCard
+                label="Vistas de catálogo"
+                value={
+                  selectedUser.catalogViews !== undefined
+                    ? selectedUser.catalogViews.toString()
+                    : "—"
+                }
+              />
+              <StatCard
+                label="Ventas registradas"
+                value={
+                  selectedUser.salesCount !== undefined
+                    ? selectedUser.salesCount.toString()
+                    : "—"
+                }
+              />
+            </div>
+
+            <p
+              style={{
+                margin: "2px 0 0",
+                fontSize: 11,
+                color: "#7a7a7a",
+              }}
+            >
+              Estos datos te ayudan a entender qué tan activo es este vendedor
+              dentro de Lokaly y si está aprovechando su plan.
+            </p>
+          </div>
+
+          {/* Bloque de plan / activar vendedor */}
           <div
             style={{
               marginTop: 8,
@@ -252,54 +354,74 @@ const UsersPage: React.FC = () => {
               borderRadius: 12,
               border: "1px solid rgba(255,255,255,0.09)",
               background: "rgba(8,8,8,0.95)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
             }}
           >
-            <h3
+            <div
               style={{
-                margin: 0,
-                fontSize: 14,
-                fontWeight: 500,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                alignItems: "center",
+                flexWrap: "wrap",
               }}
             >
-{selectedUser.seller && (
-  <button
-    onClick={async () => {
-      const ok = window.confirm(
-        "¿Seguro que quieres desactivar a este usuario como vendedor?"
-      );
-      if (!ok) return;
-      try {
-        setSaving(true);
-        await setUserSeller(selectedUser.id, false); // 🚨 seller=false
-        await loadUsers();
-        setSelectedUser((prev) =>
-          prev ? { ...prev, seller: false, sellerPlanKey: null } : prev
-        );
-      } catch (e: any) {
-        setError(e.message);
-      } finally {
-        setSaving(false);
-      }
-    }}
-    style={{
-      marginBottom: 12,
-      padding: "6px 14px",
-      borderRadius: 999,
-      border: "1px solid rgba(255,99,99,0.7)",
-      background: "rgba(120,0,0,0.18)",
-      color: "#ff9a9a",
-      fontSize: 12,
-      cursor: "pointer",
-    }}
-  >
-    Quitar vendedor
-  </button>
-)}                
-              Activar / cambiar plan de vendedor
-            </h3>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  fontWeight: 500,
+                }}
+              >
+                Activar / cambiar plan de vendedor
+              </h3>
+
+              {selectedUser.seller && (
+                <button
+                  onClick={async () => {
+                    const ok = window.confirm(
+                      "¿Seguro que quieres desactivar a este usuario como vendedor?"
+                    );
+                    if (!ok) return;
+                    try {
+                      setSaving(true);
+                      await setUserSeller(selectedUser.id, false);
+                      await loadUsers();
+                      setSelectedUser((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              seller: false,
+                              sellerPlanKey: null,
+                            }
+                          : prev
+                      );
+                    } catch (e: any) {
+                      setError(e.message);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,99,99,0.7)",
+                    background: "rgba(120,0,0,0.18)",
+                    color: "#ff9a9a",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Quitar vendedor
+                </button>
+              )}
+            </div>
+
             <p
               style={{
-                margin: "4px 0 10px",
+                margin: "0 0 10px",
                 fontSize: 12,
                 color: "#b3b3b3",
               }}
@@ -322,7 +444,7 @@ const UsersPage: React.FC = () => {
                     e.target.value as
                       | "ONE_PRODUCT"
                       | "TEN_PRODUCTS"
-                      | "UNLIMITED"
+                      | "FORTY_PRODUCTS"
                   )
                 }
                 style={{
@@ -336,7 +458,7 @@ const UsersPage: React.FC = () => {
               >
                 <option value="ONE_PRODUCT">Plan 1 producto</option>
                 <option value="TEN_PRODUCTS">Plan 10 productos</option>
-                <option value="UNLIMITED">Plan ilimitado</option>
+                <option value="FORTY_PRODUCTS">Plan ilimitado</option>
               </select>
 
               <button
@@ -430,6 +552,41 @@ const DetailCard: React.FC<{ label: string; value: string }> = ({
       style={{
         fontSize: 14,
         color: "#f5f5f5",
+      }}
+    >
+      {value}
+    </div>
+  </div>
+);
+
+const StatCard: React.FC<{ label: string; value: string }> = ({
+  label,
+  value,
+}) => (
+  <div
+    style={{
+      minWidth: 150,
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid rgba(255,255,255,0.08)",
+      background:
+        "radial-gradient(circle at top left, rgba(255,255,255,0.08), rgba(0,0,0,0.9))",
+    }}
+  >
+    <div
+      style={{
+        fontSize: 11,
+        color: "#9b9b9b",
+        marginBottom: 2,
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        fontSize: 18,
+        fontWeight: 600,
+        color: "#f2d58b",
       }}
     >
       {value}

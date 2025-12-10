@@ -207,8 +207,8 @@ const SellerCheckoutPage: React.FC = () => {
           />
 
           <PlanCard
-            selected={selectedPlan === "UNLIMITED"}
-            onClick={() => setSelectedPlan("UNLIMITED")}
+            selected={selectedPlan === "FORTY_PRODUCTS"}
+            onClick={() => setSelectedPlan("FORTY_PRODUCTS")}
             title="Plan ilimitado"
             description="Publica todos los productos que quieras durante el periodo del plan."
             badge="Ilimitado"

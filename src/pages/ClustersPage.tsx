@@ -48,10 +48,10 @@ const normalizeSellerPlans = (sp?: SellerPlans): SellerPlans => ({
     price: 99,
     ...(sp?.tenProducts ?? {}),
   },
-  unlimited: {
+  fortyProducts: {
     enabled: false,
     price: 299,
-    ...(sp?.unlimited ?? {}),
+    ...(sp?.fortyProducts ?? {}),
   },
 });
 
@@ -654,12 +654,12 @@ Esto también desactivará sus colonias.`
                   <SellerPlanCard
                     title="Plan ilimitado"
                     subtitle="Publicar productos sin límite."
-                    plan={sellerPlansForm.unlimited}
+                    plan={sellerPlansForm.fortyProducts}
                     onToggleEnabled={(v) =>
-                      handleChangePlanField("unlimited", "enabled", v)
+                      handleChangePlanField("fortyProducts", "enabled", v)
                     }
                     onChangePrice={(v) =>
-                      handleChangePlanField("unlimited", "price", v)
+                      handleChangePlanField("fortyProducts", "price", v)
                     }
                   />
                 </div>
