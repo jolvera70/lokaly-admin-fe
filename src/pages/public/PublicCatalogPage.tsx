@@ -8,7 +8,7 @@ type PublicProduct = {
   price: number;
   imageUrls: string[];
   shortDescription?: string;
-  featured?: boolean; // 👈 NUEVO
+  featured?: boolean;
 };
 
 type PublicSeller = {
@@ -44,7 +44,7 @@ function resolveImageUrl(rawUrl?: string | null): string | undefined {
   return `${PUBLIC_ORIGIN}${path}`;
 }
 
-/* ========= Carrusel de imágenes por producto con lazy + skeleton + zoom ========= */
+/* ========= Carrusel de imágenes por producto con zoom (simple y seguro) ========= */
 
 type ProductImageCarouselProps = {
   images: string[];
@@ -54,8 +54,6 @@ type ProductImageCarouselProps = {
 function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
   const [index, setIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false); // modal
-  const [isCardLoaded, setIsCardLoaded] = useState(false);
-  const [isModalLoaded, setIsModalLoaded] = useState(false);
 
   if (!images || images.length === 0) return null;
 
@@ -63,15 +61,11 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsCardLoaded(false);
-    setIsModalLoaded(false);
     setIndex((prev) => (prev - 1 + total) % total);
   };
 
   const goNext = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsCardLoaded(false);
-    setIsModalLoaded(false);
     setIndex((prev) => (prev + 1) % total);
   };
 
@@ -88,61 +82,25 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
           overflow: "hidden",
           marginBottom: 10,
           backgroundColor: "#E5E7EB",
+          cursor: "zoom-in",
         }}
+        onClick={() => setIsOpen(true)}
       >
-        {/* Skeleton / placeholder */}
-        {!isCardLoaded && (
-          <div
-            style={{
-              width: "100%",
-              height: 190,
-              background:
-                "linear-gradient(90deg, #E5E7EB 0px, #F3F4F6 40px, #E5E7EB 80px)",
-              backgroundSize: "200% 100%",
-              animation: "lokaly-skeleton 1.2s ease-in-out infinite",
-            }}
-          />
-        )}
-
-        <style>
-          {`
-            @keyframes lokaly-skeleton {
-              0% { background-position: 200% 0; }
-              100% { background-position: -200% 0; }
-            }
-          `}
-        </style>
-
-        <div
-          onClick={() => {
-            setIsOpen(true);
-            setIsModalLoaded(false);
-          }}
+        <img
+          src={current}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
           style={{
-            cursor: "zoom-in",
-            position: "absolute",
-            inset: 0,
+            width: "100%",
+            height: 190,
+            objectFit: "cover",
+            display: "block",
           }}
-        >
-          <img
-            src={current}
-            alt={alt}
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: "100%",
-              height: 190,
-              objectFit: "cover",
-              display: "block",
-              opacity: isCardLoaded ? 1 : 0,
-              transition: "opacity 0.3s ease",
-            }}
-            onLoad={() => setIsCardLoaded(true)}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-        </div>
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
 
         {/* Flechas solo si hay más de una imagen */}
         {total > 1 && (
@@ -254,22 +212,6 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
               width: "100%",
             }}
           >
-            {/* Skeleton modal */}
-            {!isModalLoaded && (
-              <div
-                style={{
-                  width: "100%",
-                  maxHeight: "90vh",
-                  height: "60vh",
-                  background:
-                    "linear-gradient(90deg, #111827 0px, #1F2937 40px, #111827 80px)",
-                  backgroundSize: "200% 100%",
-                  animation: "lokaly-skeleton 1.2s ease-in-out infinite",
-                  borderRadius: 18,
-                }}
-              />
-            )}
-
             <img
               src={current}
               alt={alt}
@@ -281,11 +223,7 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
                 objectFit: "contain",
                 borderRadius: 18,
                 backgroundColor: "#000",
-                position: "relative",
-                opacity: isModalLoaded ? 1 : 0,
-                transition: "opacity 0.3s ease",
               }}
-              onLoad={() => setIsModalLoaded(true)}
             />
 
             {/* Botón cerrar */}
