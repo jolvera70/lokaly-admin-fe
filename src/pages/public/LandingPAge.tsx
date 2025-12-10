@@ -206,29 +206,6 @@ export function LandingPage() {
                 marginBottom: 12,
               }}
             >
-              <button
-                onClick={handleSmartDownload}
-                style={{
-                  padding: "11px 20px",
-                  borderRadius: 999,
-                  backgroundColor: "#111827",
-                  color: "#FACC15",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  boxShadow:
-                    "0 14px 28px rgba(15,23,42,0.35), 0 3px 6px rgba(0,0,0,0.25)",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Descargar app Lokaly
-                <span style={{ fontSize: 16 }}>⬇</span>
-              </button>
-
               <a
                 href="#como-funciona"
                 style={{
