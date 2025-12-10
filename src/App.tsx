@@ -110,7 +110,7 @@ function App() {
         <Route
           element={<AdminShell auth={auth} onLogout={handleLogout} />}
         >
-          <Route path="/admin" element={<div>Dashboard</div>} />
+          <Route path="/admin/dashboard" element={<div>Dashboard</div>} />
           <Route path="/admin/clusters" element={<ClustersPage />} />
           <Route path="/admin/colonies" element={<ColoniesSelectorPage />} />
           <Route

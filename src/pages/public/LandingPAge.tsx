@@ -10,7 +10,19 @@ const MOCK_IMAGES = [
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80";
 
+// 🔗 URLs reales de las tiendas (pon las correctas cuando las tengas)
+const IOS_APP_URL = "https://apps.apple.com/app/idXXXXXXXXX"; // TODO: reemplazar
+const ANDROID_APP_URL =
+  "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO: reemplazar
+
 export function LandingPage() {
+  const handleSmartDownload = () => {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const storeUrl = isIOS ? IOS_APP_URL : ANDROID_APP_URL;
+    window.open(storeUrl, "_blank");
+  };
+
   return (
     <div
       style={{
@@ -101,20 +113,21 @@ export function LandingPage() {
               Cómo funciona
             </a>
 
+            {/* Login solo para admin (clarito) */}
             <Link
               to="/login"
               style={{
-                fontSize: 13,
-                color: "#111827",
+                fontSize: 11,
+                color: "#6B7280",
                 textDecoration: "none",
-                fontWeight: 600,
-                padding: "6px 12px",
+                fontWeight: 500,
+                padding: "4px 10px",
                 borderRadius: 999,
-                border: "1px solid #D1D5DB",
-                backgroundColor: "#FFFFFF",
+                border: "1px dashed #D1D5DB",
+                backgroundColor: "#F9FAFB",
               }}
             >
-              Iniciar sesión
+              Panel admin
             </Link>
           </nav>
         </header>
@@ -201,7 +214,7 @@ export function LandingPage() {
               <li>Vende solo en tu colonia o residencial.</li>
             </ul>
 
-            {/* CTA principal */}
+            {/* CTA principal → descarga de la app */}
             <div
               style={{
                 display: "flex",
@@ -210,8 +223,8 @@ export function LandingPage() {
                 marginBottom: 12,
               }}
             >
-              <Link
-                to="/login"
+              <button
+                onClick={handleSmartDownload}
                 style={{
                   padding: "11px 20px",
                   borderRadius: 999,
@@ -225,11 +238,13 @@ export function LandingPage() {
                   gap: 8,
                   boxShadow:
                     "0 14px 28px rgba(15,23,42,0.35), 0 3px 6px rgba(0,0,0,0.25)",
+                  border: "none",
+                  cursor: "pointer",
                 }}
               >
-                Crear mi catálogo ahora
-                <span style={{ fontSize: 16 }}>→</span>
-              </Link>
+                Descargar app Lokaly
+                <span style={{ fontSize: 16 }}>⬇</span>
+              </button>
 
               <a
                 href="#como-funciona"
@@ -251,7 +266,7 @@ export function LandingPage() {
               </a>
             </div>
 
-            {/* Botones de tienda */}
+            {/* Botones de tienda específicos */}
             <div
               style={{
                 display: "flex",
@@ -262,7 +277,7 @@ export function LandingPage() {
             >
               {/* App Store */}
               <a
-                href="https://apps.apple.com/app/idXXXXXXXXX" // TODO: reemplaza con tu ID real
+                href={IOS_APP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -283,7 +298,7 @@ export function LandingPage() {
 
               {/* Google Play */}
               <a
-                href="https://play.google.com/store/apps/details?id=com.tuempresa.lokaly" // TODO
+                href={ANDROID_APP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -309,7 +324,8 @@ export function LandingPage() {
                 color: "#6B7280",
               }}
             >
-              ¿Ya tienes la app? Inicia sesión y crea tu catálogo desde Lokaly.
+              ¿Ya tienes la app? Abre Lokaly en tu teléfono y administra tus
+              productos desde ahí.
             </p>
           </div>
 
@@ -652,10 +668,10 @@ export function LandingPage() {
                   marginBottom: 3,
                 }}
               >
-                Crea tu cuenta
+                Descarga Lokaly
               </div>
               <p style={{ margin: 0 }}>
-                Entra a Lokaly desde la app o web e inicia sesión.
+                Instala la app desde App Store o Google Play.
               </p>
             </div>
             <div>
@@ -675,11 +691,10 @@ export function LandingPage() {
                   marginBottom: 3,
                 }}
               >
-                Registra tu colonia
+                Crea tu cuenta
               </div>
               <p style={{ margin: 0 }}>
-                Indica en qué residencial o colonia vendes para llegar a tus
-                vecinos.
+                Regístrate y elige la colonia o residencial donde vendes.
               </p>
             </div>
             <div>
@@ -702,7 +717,7 @@ export function LandingPage() {
                 Publica tus productos
               </div>
               <p style={{ margin: 0 }}>
-                Sube fotos, precios y descripciones desde la app Lokaly.
+                Sube fotos, precios y descripciones desde la app.
               </p>
             </div>
             <div>
@@ -722,40 +737,79 @@ export function LandingPage() {
                   marginBottom: 3,
                 }}
               >
-                Comparte tu link
+                Comparte tu catálogo
               </div>
               <p style={{ margin: 0 }}>
-                Envía tu catálogo por WhatsApp, grupos de vecinos o redes y
-                recibe pedidos.
+                Envía tu link por WhatsApp y grupos de vecinos y empieza a
+                vender.
               </p>
             </div>
           </div>
 
-          {/* CTA repetido abajo */}
+          {/* CTA final → descarga */}
           <div
             style={{
               marginTop: 20,
               textAlign: "center",
             }}
           >
-            <Link
-              to="/login"
+            <p
               style={{
-                display: "inline-flex",
-                padding: "10px 20px",
-                borderRadius: 999,
-                backgroundColor: "#111827",
-                color: "#FACC15",
-                fontSize: 13,
-                fontWeight: 700,
-                textDecoration: "none",
-                alignItems: "center",
-                gap: 8,
+                fontSize: 12,
+                color: "#6B7280",
+                marginBottom: 10,
               }}
             >
-              Empezar mi catálogo en Lokaly
-              <span>✨</span>
-            </Link>
+              Descarga Lokaly y crea tu catálogo hoy mismo:
+            </p>
+
+            <div
+              style={{
+                display: "inline-flex",
+                gap: 10,
+                flexWrap: "wrap",
+                justifyContent: "center",
+              }}
+            >
+              <a
+                href={IOS_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  backgroundColor: "#111827",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                🍎 App Store
+              </a>
+              <a
+                href={ANDROID_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  backgroundColor: "#111827",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                🤖 Google Play
+              </a>
+            </div>
           </div>
         </section>
 
