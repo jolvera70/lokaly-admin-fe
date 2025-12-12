@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-
 const MOCK_IMAGES = [
   "https://images.unsplash.com/photo-1518655048521-f130df041f66?auto=format&fit=crop&w=600&q=80",
   "https://images.unsplash.com/photo-1505691723518-36a5ac3be353?auto=format&fit=crop&w=600&q=80",
@@ -16,12 +14,7 @@ const ANDROID_APP_URL =
   "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO: reemplazar
 
 export function LandingPage() {
-  const handleSmartDownload = () => {
-    const ua = navigator.userAgent || "";
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const storeUrl = isIOS ? IOS_APP_URL : ANDROID_APP_URL;
-    window.open(storeUrl, "_blank");
-  };
+
 
   return (
     <div
