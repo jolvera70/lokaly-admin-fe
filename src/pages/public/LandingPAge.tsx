@@ -766,16 +766,35 @@ export function LandingPage() {
           </div>
         </section>
 
-        <footer
-          style={{
-            marginTop: 32,
-            fontSize: 11,
-            color: "#9CA3AF",
-            textAlign: "center",
-          }}
-        >
-          Lokaly · Compra y vende entre vecinos
-        </footer>
+<footer
+  style={{
+    marginTop: 32,
+    fontSize: 11,
+    color: "#9CA3AF",
+    textAlign: "center",
+    lineHeight: 1.6,
+  }}
+>
+  <div>Lokaly · Compra y vende entre vecinos</div>
+
+  <div style={{ marginTop: 6 }}>
+    Soporte:&nbsp;
+    <a
+      href="mailto:soporte@lokaly.site"
+      style={{
+        color: "#111827",
+        textDecoration: "none",
+        fontWeight: 600,
+      }}
+    >
+      soporte@lokaly.site
+    </a>
+  </div>
+
+  <div style={{ marginTop: 4 }}>
+    © {new Date().getFullYear()} Lokaly
+  </div>
+</footer>
       </div>
     </div>
   );
