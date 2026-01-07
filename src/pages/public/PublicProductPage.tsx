@@ -598,7 +598,7 @@ export function PublicProductPage() {
       };
 
       // Nota: este endpoint es "placeholder" (ajústalo a tu BE real)
-      const res = await fetch(`${PUBLIC_BASE_URL}/orders`, {
+      const res = await fetch(`${PUBLIC_BASE_URL}/order-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
