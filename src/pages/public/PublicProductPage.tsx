@@ -43,11 +43,43 @@ function moneyMXN(value: number) {
   return `$${(value ?? 0).toLocaleString("es-MX")} MXN`;
 }
 
+function useIsMobile(breakpointPx = 520) {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia(`(max-width: ${breakpointPx}px)`).matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpointPx}px)`);
+    const handler = () => setIsMobile(mq.matches);
+    handler();
+
+    // safari compatibility
+    if (mq.addEventListener) mq.addEventListener("change", handler);
+    else mq.addListener(handler);
+
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", handler);
+      else mq.removeListener(handler);
+    };
+  }, [breakpointPx]);
+
+  return isMobile;
+}
+
 /* =======================
    Image carousel with zoom
 ======================= */
 
-function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }) {
+function ProductImageCarousel({
+  images,
+  alt,
+  isMobile,
+}: {
+  images: string[];
+  alt: string;
+  isMobile: boolean;
+}) {
   const [index, setIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -66,15 +98,17 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
     setIndex((prev) => (prev + 1) % total);
   };
 
+  const mediaHeight = isMobile ? "clamp(260px, 44vh, 360px)" : "360px";
+
   return (
     <>
-      <div style={s.media} onClick={() => setIsOpen(true)}>
+      <div style={{ ...s.media, height: mediaHeight as any }} onClick={() => setIsOpen(true)}>
         <img
           src={current}
           alt={alt}
           loading="lazy"
           decoding="async"
-          style={s.mediaImg}
+          style={{ ...s.mediaImg, height: mediaHeight as any }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
@@ -138,6 +172,7 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
 export function PublicProductPage() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile(520);
 
   const [data, setData] = useState<PublicProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,7 +187,6 @@ export function PublicProductPage() {
       setLoading(true);
       setError(null);
 
-      // ✅ Endpoint correcto
       const res = await fetch(`${PUBLIC_BASE_URL}/products/${productId}`);
       if (!res.ok) throw new Error("No se pudo cargar el producto");
 
@@ -164,8 +198,7 @@ export function PublicProductPage() {
         ? raw.images
         : [];
 
-      const single =
-        (raw.imageUrl as string | undefined) || (raw.image as string | undefined);
+      const single = (raw.imageUrl as string | undefined) || (raw.image as string | undefined);
 
       const resolvedImages: string[] = rawImages
         .map((u) => resolveImageUrl(u))
@@ -187,7 +220,7 @@ export function PublicProductPage() {
           id: raw.seller?.id ?? raw.sellerId,
           name: raw.seller?.fullName ?? raw.seller?.name ?? "Vendedor",
           slug: raw.seller?.slug ?? raw.sellerSlug ?? "",
-          whatsapp: raw.seller?.whatsapp,
+          whatsapp: raw.seller?.whatsapp ?? undefined,
           clusterName: raw.seller?.clusterName ?? raw.seller?.colonyName,
         },
       };
@@ -217,7 +250,7 @@ export function PublicProductPage() {
   if (loading) {
     return (
       <div style={s.page}>
-        <div style={s.container}>
+        <div style={{ ...s.container, padding: isMobile ? "12px 12px 0" : "14px 14px 0" }}>
           <div style={s.skeletonTop} />
           <div style={s.skeletonBody} />
         </div>
@@ -228,12 +261,12 @@ export function PublicProductPage() {
   if (error || !data) {
     return (
       <div style={s.page}>
-        <div style={s.container}>
+        <div style={{ ...s.container, padding: isMobile ? "12px 12px 0" : "14px 14px 0" }}>
           <div style={s.errorCard}>
             <div style={s.errorTitle}>Error</div>
             <div style={s.errorText}>{error}</div>
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-              <button onClick={() => navigate(-1)} style={s.btnGhost}>
+              <button onClick={() => navigate(-1)} style={s.btnGhostDark}>
                 Volver
               </button>
               <button onClick={loadProduct} style={s.btnBlack}>
@@ -251,7 +284,7 @@ export function PublicProductPage() {
 
   return (
     <div style={s.page}>
-      <div style={s.container}>
+      <div style={{ ...s.container, padding: isMobile ? "12px 12px 0" : "14px 14px 0" }}>
         {/* Header like app */}
         <header style={s.header}>
           <button onClick={() => navigate(-1)} style={s.backBtn} aria-label="Volver">
@@ -287,20 +320,20 @@ export function PublicProductPage() {
         {/* Product card */}
         <section style={s.card}>
           {data.imageUrls.length > 0 ? (
-            <ProductImageCarousel images={data.imageUrls} alt={data.name} />
+            <ProductImageCarousel images={data.imageUrls} alt={data.name} isMobile={isMobile} />
           ) : (
-            <div style={s.noImg}>Sin imagen</div>
+            <div style={{ ...s.noImg, height: isMobile ? 280 : 360 }}>Sin imagen</div>
           )}
 
-          <div style={s.cardBody}>
+          <div style={{ ...s.cardBody, padding: isMobile ? 12 : 14 }}>
             <div style={s.titleRow}>
-              <h1 style={s.title}>{data.name}</h1>
+              <h1 style={{ ...s.title, fontSize: isMobile ? 18 : 20 }}>{data.name}</h1>
 
               {data.featured && <span style={s.pillFeatured}>Destacado ✨</span>}
               <span style={s.pillAvailable}>Disponible</span>
             </div>
 
-            <div style={s.price}>{moneyMXN(data.price)}</div>
+            <div style={{ ...s.price, fontSize: isMobile ? 16 : 18 }}>{moneyMXN(data.price)}</div>
 
             {data.description ? (
               <p style={s.desc}>{data.description}</p>
@@ -328,7 +361,7 @@ export function PublicProductPage() {
         </section>
 
         {/* Spacer para que el CTA sticky no tape contenido */}
-        <div style={{ height: 82 }} />
+        <div style={{ height: 92 }} />
       </div>
 
       {/* Sticky CTA bottom (like app) */}
@@ -371,7 +404,7 @@ function toast(msg: string) {
 }
 
 /* =======================
-   Styles (app-like)
+   Styles (mobile-first)
 ======================= */
 
 const s: Record<string, React.CSSProperties> = {
@@ -405,11 +438,12 @@ const s: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: 16,
     fontWeight: 900,
+    flex: "0 0 auto",
   },
   brandTitle: { fontWeight: 1000, fontSize: 18, lineHeight: 1.1 },
-  brandSub: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  brandSub: { fontSize: 12, color: "#6B7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
 
-  headerRight: { marginLeft: "auto", display: "flex", gap: 8 },
+  headerRight: { marginLeft: "auto", display: "flex", gap: 8, flex: "0 0 auto" },
   iconBtn: {
     width: 36,
     height: 36,
@@ -427,7 +461,7 @@ const s: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     boxShadow: "0 14px 30px rgba(17,24,39,0.08)",
   },
-  cardBody: { padding: 12 },
+  cardBody: { padding: 14 },
 
   titleRow: {
     display: "flex",
@@ -438,12 +472,13 @@ const s: Record<string, React.CSSProperties> = {
   },
   title: {
     margin: 0,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 1000,
     lineHeight: 1.15,
     flex: "1 1 220px",
+    minWidth: 0,
   },
-  price: { fontSize: 16, fontWeight: 1000, marginBottom: 10 },
+  price: { fontSize: 18, fontWeight: 1000, marginBottom: 10 },
 
   pillFeatured: {
     padding: "6px 10px",
@@ -493,17 +528,36 @@ const s: Record<string, React.CSSProperties> = {
     color: "#F9FAFB",
     whiteSpace: "nowrap",
   },
+  btnGhostDark: {
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 12,
+    color: "#111827",
+  },
+  btnBlack: {
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "none",
+    background: "#111827",
+    color: "#F9FAFB",
+    cursor: "pointer",
+    fontWeight: 950,
+  },
 
   /* carousel */
   media: { position: "relative", width: "100%", backgroundColor: "#F3F4F6", cursor: "zoom-in" },
-  mediaImg: { width: "100%", height: 320, objectFit: "cover", display: "block" },
+  mediaImg: { width: "100%", objectFit: "cover", display: "block" },
   mediaNavLeft: {
     position: "absolute",
     top: "50%",
     left: 10,
     transform: "translateY(-50%)",
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
     borderRadius: 999,
     border: "none",
     backgroundColor: "rgba(17,24,39,0.55)",
@@ -516,8 +570,8 @@ const s: Record<string, React.CSSProperties> = {
     top: "50%",
     right: 10,
     transform: "translateY(-50%)",
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
     borderRadius: 999,
     border: "none",
     backgroundColor: "rgba(17,24,39,0.55)",
@@ -539,7 +593,7 @@ const s: Record<string, React.CSSProperties> = {
   dot: { height: 7, borderRadius: 999, backgroundColor: "#FACC15" },
 
   noImg: {
-    height: 320,
+    height: 360,
     background: "#F3F4F6",
     display: "flex",
     alignItems: "center",
@@ -619,10 +673,10 @@ const s: Record<string, React.CSSProperties> = {
     right: 0,
     bottom: 0,
     zIndex: 50,
-    background: "rgba(246,246,244,0.92)",
+    background: "rgba(246,246,244,0.94)",
     backdropFilter: "blur(10px)",
     borderTop: "1px solid #E5E7EB",
-    padding: "10px 14px",
+    padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
     display: "flex",
     gap: 10,
     justifyContent: "center",
@@ -660,15 +714,6 @@ const s: Record<string, React.CSSProperties> = {
   },
   errorTitle: { fontWeight: 1000, color: "#991B1B" },
   errorText: { marginTop: 6, color: "#6B7280" },
-  btnBlack: {
-    padding: "10px 12px",
-    borderRadius: 999,
-    border: "none",
-    background: "#111827",
-    color: "#F9FAFB",
-    cursor: "pointer",
-    fontWeight: 950,
-  },
 
   skeletonTop: {
     height: 380,
@@ -687,7 +732,7 @@ const s: Record<string, React.CSSProperties> = {
   toast: {
     position: "fixed",
     left: "50%",
-    bottom: 90,
+    bottom: "calc(90px + env(safe-area-inset-bottom))",
     transform: "translateX(-50%)",
     zIndex: 99999,
     padding: "10px 14px",
