@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+// src/pages/public/PublicProductPage.tsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PUBLIC_BASE_URL, PUBLIC_ORIGIN } from "../../api";
+
+/* =======================
+   Types
+======================= */
 
 type PublicProductDetail = {
   id: string;
@@ -9,6 +14,10 @@ type PublicProductDetail = {
   description?: string;
   imageUrls: string[];
   featured?: boolean;
+
+  // ✅ sin cobro, solo disponibilidad
+  availableQuantity?: number | null;
+
   seller: {
     id: string;
     name: string;
@@ -17,6 +26,18 @@ type PublicProductDetail = {
     clusterName?: string;
   };
 };
+
+type OrderRequestPayload = {
+  productId: string;
+  quantity: number;
+  note?: string | null;
+  buyerName: string;
+  buyerWhatsapp: string;
+};
+
+/* =======================
+   Helpers
+======================= */
 
 function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
@@ -54,7 +75,6 @@ function useIsMobile(breakpointPx = 520) {
     const handler = () => setIsMobile(mq.matches);
     handler();
 
-    // safari compatibility
     if (mq.addEventListener) mq.addEventListener("change", handler);
     else mq.addListener(handler);
 
@@ -65,6 +85,15 @@ function useIsMobile(breakpointPx = 520) {
   }, [breakpointPx]);
 
   return isMobile;
+}
+
+function clamp(lines: number): React.CSSProperties {
+  return {
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: lines as any,
+    overflow: "hidden",
+  };
 }
 
 /* =======================
@@ -143,7 +172,6 @@ function ProductImageCarousel({
         <div onClick={() => setIsOpen(false)} style={s.modalBackdrop}>
           <div onClick={(e) => e.stopPropagation()} style={s.modalFrame}>
             <img src={current} alt={alt} style={s.modalImg} />
-
             <button onClick={() => setIsOpen(false)} style={s.modalClose} aria-label="Cerrar">
               ✕
             </button>
@@ -166,6 +194,259 @@ function ProductImageCarousel({
 }
 
 /* =======================
+   Tiny toast (sin libs)
+======================= */
+
+let toastTimer: any = null;
+function toast(msg: string) {
+  const elId = "lokaly-toast";
+  let el = document.getElementById(elId);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = elId;
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  Object.assign(el.style, s.toast);
+  el.style.opacity = "1";
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    if (el) el.style.opacity = "0";
+  }, 1100);
+}
+
+/* =======================
+   Professional Bottom Sheet
+======================= */
+
+function OrderSheet({
+  open,
+  onClose,
+  productName,
+  availableQty,
+  buyerName,
+  setBuyerName,
+  buyerWhatsapp,
+  setBuyerWhatsapp,
+  qty,
+  setQty,
+  note,
+  setNote,
+  submitting,
+  canSubmit,
+  onSubmit,
+  orderOk,
+  onOpenWhats,
+}: {
+  open: boolean;
+  onClose: () => void;
+  productName: string;
+  availableQty?: number | null;
+  buyerName: string;
+  setBuyerName: (v: string) => void;
+  buyerWhatsapp: string;
+  setBuyerWhatsapp: (v: string) => void;
+  qty: number;
+  setQty: (v: number) => void;
+  note: string;
+  setNote: (v: string) => void;
+  submitting: boolean;
+  canSubmit: boolean;
+  onSubmit: () => void;
+  orderOk: { id?: string } | null;
+  onOpenWhats: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+
+    // lock scroll behind
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const maxQty = availableQty == null ? 99 : Math.max(0, Number(availableQty));
+  const stockLabel =
+    availableQty == null
+      ? "Disponibilidad por confirmar"
+      : availableQty === 0
+      ? "Agotado"
+      : `Quedan ${availableQty} disponibles`;
+
+  return (
+    <div style={s.sheetBackdrop} onClick={onClose}>
+      <div style={s.sheet} onClick={(e) => e.stopPropagation()}>
+        <div style={s.sheetHeaderPro}>
+          <div style={{ minWidth: 0 }}>
+            <div style={s.sheetTitle}>Solicitar pedido</div>
+            <div style={s.sheetPillsRow}>
+              <span style={availableQty === 0 ? s.sheetPillOut : s.sheetPill}>{stockLabel}</span>
+            </div>
+          </div>
+
+          <button onClick={onClose} style={s.sheetClosePro} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+
+        <div style={s.sheetBody}>
+          {/* Product summary */}
+          <div style={s.productCard}>
+            <div style={s.productCardLabel}>Producto</div>
+            <div style={s.productCardName}>{productName}</div>
+          </div>
+
+          {!orderOk ? (
+            <>
+              <div style={s.formGridPro}>
+                <div style={s.fieldPro}>
+                  <label style={s.labelPro}>Tu nombre</label>
+                  <input
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                    placeholder="Ej. Jorge"
+                    style={s.inputPro}
+                    autoComplete="name"
+                  />
+                </div>
+
+                <div style={s.fieldPro}>
+                  <label style={s.labelPro}>Tu WhatsApp</label>
+                  <input
+                    value={buyerWhatsapp}
+                    onChange={(e) => setBuyerWhatsapp(e.target.value)}
+                    placeholder="10 dígitos"
+                    inputMode="numeric"
+                    style={s.inputPro}
+                    autoComplete="tel"
+                  />
+                  <div style={s.helperPro}>Solo para que el vendedor pueda contactarte.</div>
+                </div>
+
+                <div style={s.fieldPro}>
+                  <label style={s.labelPro}>Cantidad</label>
+
+                  <div style={s.qtyRowPro}>
+                    <button
+                      onClick={() => setQty(Math.max(1, qty - 1))}
+                      style={s.qtyBtnPro}
+                      disabled={qty <= 1}
+                      aria-label="Disminuir"
+                    >
+                      −
+                    </button>
+
+                    <input
+                      value={String(qty)}
+                      onChange={(e) => {
+                        const raw = (e.target.value || "").replace(/[^\d]/g, "");
+                        const n = Number(raw || "1");
+                        const cap = availableQty == null ? 99 : maxQty;
+                        const capped = Math.max(1, Math.min(Number.isFinite(n) ? n : 1, cap));
+                        setQty(capped);
+                      }}
+                      inputMode="numeric"
+                      style={s.qtyInputPro}
+                      aria-label="Cantidad"
+                    />
+
+                    <button
+                      onClick={() => setQty(Math.min(qty + 1, availableQty == null ? 99 : maxQty))}
+                      style={s.qtyBtnPro}
+                      disabled={availableQty != null && qty >= maxQty}
+                      aria-label="Aumentar"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {availableQty != null && qty > availableQty ? (
+                    <div style={s.errorPro}>No hay suficiente stock disponible.</div>
+                  ) : null}
+                </div>
+
+                <div style={s.fieldPro}>
+                  <label style={s.labelPro}>Nota (opcional)</label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Ej. ¿Entregas hoy? / Paso en la tarde"
+                    style={s.textareaPro}
+                  />
+                </div>
+
+                <div style={s.tipCardPro}>
+                  <div style={s.tipIconPro}>i</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={s.tipTitlePro}>Tip</div>
+                    <div style={s.tipTextPro}>
+                      Esto no cobra. Solo envía una solicitud al vendedor para que te contacte.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={s.sheetActionsPro}>
+                <button onClick={onClose} style={s.sheetGhostPro}>
+                  Cancelar
+                </button>
+
+                <button
+                  onClick={onSubmit}
+                  style={{
+                    ...s.sheetPrimaryPro,
+                    ...(canSubmit ? null : s.sheetPrimaryDisabledPro),
+                  }}
+                  disabled={!canSubmit}
+                >
+                  {submitting ? "Enviando…" : "Enviar solicitud"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={s.okBox}>
+                <div style={{ fontWeight: 1000, fontSize: 16 }}>✅ Solicitud enviada</div>
+                <div style={{ marginTop: 6, color: "#6B7280", fontSize: 13, lineHeight: 1.45 }}>
+                  El vendedor recibió tu pedido. Te contactará por WhatsApp.
+                  {orderOk.id ? (
+                    <>
+                      {" "}
+                      ID: <b>{orderOk.id}</b>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              <div style={s.sheetActionsPro}>
+                <button onClick={onClose} style={s.sheetGhostPro}>
+                  Cerrar
+                </button>
+                <button onClick={onOpenWhats} style={s.sheetPrimaryGreenPro}>
+                  Abrir WhatsApp
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =======================
    Page
 ======================= */
 
@@ -178,7 +459,32 @@ export function PublicProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ bottom sheet
+  const [orderOpen, setOrderOpen] = useState(false);
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerWhatsapp, setBuyerWhatsapp] = useState("");
+  const [qty, setQty] = useState(1);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [orderOk, setOrderOk] = useState<{ id?: string } | null>(null);
+
   const productUrl = useMemo(() => window.location.href, []);
+
+  // remember buyer info (pro UX)
+  useEffect(() => {
+    const n = localStorage.getItem("lokaly_buyer_name") || "";
+    const w = localStorage.getItem("lokaly_buyer_whatsapp") || "";
+    if (n) setBuyerName(n);
+    if (w) setBuyerWhatsapp(w);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("lokaly_buyer_name", buyerName);
+  }, [buyerName]);
+
+  useEffect(() => {
+    localStorage.setItem("lokaly_buyer_whatsapp", buyerWhatsapp);
+  }, [buyerWhatsapp]);
 
   const loadProduct = useCallback(async () => {
     if (!productId) return;
@@ -205,8 +511,8 @@ export function PublicProductPage() {
         .filter(Boolean) as string[];
 
       if (single) {
-        const s = resolveImageUrl(single);
-        if (s) resolvedImages.push(s);
+        const sImg = resolveImageUrl(single);
+        if (sImg) resolvedImages.push(sImg);
       }
 
       const normalized: PublicProductDetail = {
@@ -216,12 +522,13 @@ export function PublicProductPage() {
         description: raw.description ?? raw.shortDescription ?? raw.longDescription,
         imageUrls: resolvedImages,
         featured: !!raw.featured,
+        availableQuantity: raw.availableQuantity ?? null,
         seller: {
-          id: raw.seller?.id ?? raw.sellerId,
-          name: raw.seller?.fullName ?? raw.seller?.name ?? "Vendedor",
-          slug: raw.seller?.slug ?? raw.sellerSlug ?? "",
-          whatsapp: raw.seller?.whatsapp ?? undefined,
-          clusterName: raw.seller?.clusterName ?? raw.seller?.colonyName,
+          id: raw.sellerId ?? "",
+          name: raw.sellerName ?? "Vendedor",
+          slug: raw.sellerSlug ?? "",
+          whatsapp: raw.sellerWhatsapp ?? undefined,
+          clusterName: raw.clusterName ?? raw.sellerClusterName ?? undefined,
         },
       };
 
@@ -244,6 +551,75 @@ export function PublicProductPage() {
       toast("Link copiado ✅");
     } catch {
       alert("No se pudo copiar. Copia manual: " + window.location.href);
+    }
+  }
+
+  const whatsappMessage = useMemo(() => {
+    if (!data) return "";
+    return `Hola! Me interesa ${data.name} (${moneyMXN(data.price)}). Lo vi aquí: ${productUrl}`;
+  }, [data, productUrl]);
+
+  const available = data?.availableQuantity;
+  const isOutOfStock = available === 0;
+  const maxQty = available == null ? 99 : Math.max(0, Number(available));
+
+  function openOrderModal() {
+    setOrderOk(null);
+    setQty(1);
+    setNote("");
+    setOrderOpen(true);
+  }
+
+  const canSubmit = useMemo(() => {
+    if (!data) return false;
+    if (isOutOfStock) return false;
+
+    const nameOk = buyerName.trim().length >= 2;
+    const wa = cleanPhone(buyerWhatsapp);
+    const waOk = wa.length >= 10;
+    const qtyOk = qty >= 1 && qty <= (available == null ? 99 : maxQty);
+
+    return nameOk && waOk && qtyOk && !submitting;
+  }, [available, buyerName, buyerWhatsapp, data, isOutOfStock, maxQty, qty, submitting]);
+
+  async function submitOrderRequest() {
+    if (!data) return;
+    if (!canSubmit) return;
+
+    try {
+      setSubmitting(true);
+
+      const payload: OrderRequestPayload = {
+        productId: data.id,
+        quantity: qty,
+        note: note?.trim() || null,
+        buyerName: buyerName.trim(),
+        buyerWhatsapp: cleanPhone(buyerWhatsapp),
+      };
+
+      // Nota: este endpoint es "placeholder" (ajústalo a tu BE real)
+      const res = await fetch(`${PUBLIC_BASE_URL}/order-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        let msg = "No se pudo enviar la solicitud.";
+        try {
+          const err = await res.json();
+          msg = err?.message || err?.error || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const saved = await res.json().catch(() => ({}));
+      setOrderOk({ id: saved?.id });
+      toast("Solicitud enviada ✅");
+    } catch (e: any) {
+      alert(e?.message || "Error enviando solicitud");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -279,23 +655,40 @@ export function PublicProductPage() {
     );
   }
 
-  const whatsappMessage =
-    `Hola! Me interesa ${data.name} (${moneyMXN(data.price)}). ` + `Lo vi aquí: ${productUrl}`;
+  const stockLabel =
+    available == null ? "Disponible" : available === 0 ? "Agotado" : `Quedan ${available}`;
 
   return (
     <div style={s.page}>
       <div style={{ ...s.container, padding: isMobile ? "12px 12px 0" : "14px 14px 0" }}>
-        {/* Header like app */}
+        {/* Header */}
         <header style={s.header}>
           <button onClick={() => navigate(-1)} style={s.backBtn} aria-label="Volver">
-            ←
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#111827"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
           </button>
 
           <div style={{ minWidth: 0 }}>
             <div style={s.brandTitle}>Lokaly</div>
             <div style={s.brandSub}>
-              {data.seller.clusterName || "Tu zona"}{" "}
-              <span style={{ opacity: 0.55 }}>· {data.seller.name}</span>
+              {data.seller.clusterName ? (
+                <>
+                  {data.seller.clusterName} <span style={{ opacity: 0.55 }}>· {data.seller.name}</span>
+                </>
+              ) : (
+                <span style={{ opacity: 0.75 }}>{data.seller.name}</span>
+              )}
             </div>
           </div>
 
@@ -312,19 +705,20 @@ export function PublicProductPage() {
             ) : null}
 
             <button onClick={copyLink} style={s.iconBtn} aria-label="Copiar link" title="Copiar link">
-                <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="gray"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#111827"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ display: "block" }}
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
             </button>
           </div>
         </header>
@@ -340,24 +734,19 @@ export function PublicProductPage() {
           <div style={{ ...s.cardBody, padding: isMobile ? 12 : 14 }}>
             <div style={s.titleRow}>
               <h1 style={{ ...s.title, fontSize: isMobile ? 18 : 20 }}>{data.name}</h1>
-
               {data.featured && <span style={s.pillFeatured}>Destacado ✨</span>}
-              <span style={s.pillAvailable}>Disponible</span>
+              <span style={isOutOfStock ? s.pillOut : s.pillAvailable}>{stockLabel}</span>
             </div>
 
             <div style={{ ...s.price, fontSize: isMobile ? 16 : 18 }}>{moneyMXN(data.price)}</div>
 
-            {data.description ? (
-              <p style={s.desc}>{data.description}</p>
-            ) : (
-              <p style={s.descMuted}>Este producto no tiene descripción.</p>
-            )}
+            {data.description ? <p style={s.desc}>{data.description}</p> : <p style={s.descMuted}>Este producto no tiene descripción.</p>}
 
             {/* Seller strip */}
             <div style={s.sellerStrip}>
               <div style={{ minWidth: 0 }}>
                 <div style={s.sellerName}>{data.seller.name}</div>
-                <div style={s.sellerZone}>{data.seller.clusterName || "Tu zona"}</div>
+                <div style={s.sellerZone}>{data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}</div>
               </div>
 
               <button
@@ -372,47 +761,51 @@ export function PublicProductPage() {
           </div>
         </section>
 
-        {/* Spacer para que el CTA sticky no tape contenido */}
-        <div style={{ height: 92 }} />
+        <div style={{ height: 110 }} />
       </div>
 
-      {/* Sticky CTA bottom (like app) */}
+      {/* Sticky CTA */}
       <div style={s.bottomBar}>
         <button onClick={copyLink} style={s.bottomGhost}>
           Copiar link
         </button>
+
+        <button onClick={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)} style={s.bottomWhats}>
+          WhatsApp
+        </button>
+
         <button
-          onClick={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)}
-          style={s.bottomWhats}
+          onClick={openOrderModal}
+          style={{ ...s.bottomBlack, ...(isOutOfStock ? s.bottomDisabled : null) }}
+          disabled={isOutOfStock}
+          title={isOutOfStock ? "Producto agotado" : "Enviar solicitud al vendedor"}
         >
-          Pedir por WhatsApp
+          {isOutOfStock ? "Agotado" : "Solicitar"}
         </button>
       </div>
+
+      {/* ✅ Pro sheet */}
+      <OrderSheet
+        open={orderOpen}
+        onClose={() => setOrderOpen(false)}
+        productName={data.name}
+        availableQty={available}
+        buyerName={buyerName}
+        setBuyerName={setBuyerName}
+        buyerWhatsapp={buyerWhatsapp}
+        setBuyerWhatsapp={setBuyerWhatsapp}
+        qty={qty}
+        setQty={setQty}
+        note={note}
+        setNote={setNote}
+        submitting={submitting}
+        canSubmit={canSubmit}
+        onSubmit={submitOrderRequest}
+        orderOk={orderOk}
+        onOpenWhats={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)}
+      />
     </div>
   );
-}
-
-/* =======================
-   Tiny toast (sin libs)
-======================= */
-
-let toastTimer: any = null;
-function toast(msg: string) {
-  const elId = "lokaly-toast";
-  let el = document.getElementById(elId);
-  if (!el) {
-    el = document.createElement("div");
-    el.id = elId;
-    document.body.appendChild(el);
-  }
-  el.textContent = msg;
-  Object.assign(el.style, s.toast);
-  el.style.opacity = "1";
-
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    if (el) el.style.opacity = "0";
-  }, 1100);
 }
 
 /* =======================
@@ -420,16 +813,8 @@ function toast(msg: string) {
 ======================= */
 
 const s: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#F6F6F4",
-    color: "#111827",
-  },
-  container: {
-    maxWidth: 720,
-    margin: "0 auto",
-    padding: "14px 14px 0",
-  },
+  page: { minHeight: "100vh", background: "#F6F6F4", color: "#111827" },
+  container: { maxWidth: 720, margin: "0 auto", padding: "14px 14px 0" },
 
   header: {
     position: "sticky",
@@ -448,12 +833,20 @@ const s: Record<string, React.CSSProperties> = {
     border: "1px solid #E5E7EB",
     background: "#fff",
     cursor: "pointer",
-    fontSize: 16,
-    fontWeight: 900,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     flex: "0 0 auto",
   },
   brandTitle: { fontWeight: 1000, fontSize: 18, lineHeight: 1.1 },
-  brandSub: { fontSize: 12, color: "#6B7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  brandSub: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
 
   headerRight: { marginLeft: "auto", display: "flex", gap: 8, flex: "0 0 auto" },
   iconBtn: {
@@ -463,7 +856,9 @@ const s: Record<string, React.CSSProperties> = {
     border: "1px solid #E5E7EB",
     background: "#fff",
     cursor: "pointer",
-    fontSize: 16,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   card: {
@@ -475,21 +870,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   cardBody: { padding: 14 },
 
-  titleRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  title: {
-    margin: 0,
-    fontSize: 20,
-    fontWeight: 1000,
-    lineHeight: 1.15,
-    flex: "1 1 220px",
-    minWidth: 0,
-  },
+  titleRow: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 },
+  title: { margin: 0, fontSize: 20, fontWeight: 1000, lineHeight: 1.15, flex: "1 1 220px", minWidth: 0 },
   price: { fontSize: 18, fontWeight: 1000, marginBottom: 10 },
 
   pillFeatured: {
@@ -509,6 +891,15 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     background: "#DCFCE7",
     color: "#16A34A",
+    whiteSpace: "nowrap",
+  },
+  pillOut: {
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+    background: "#FEE2E2",
+    color: "#B91C1C",
     whiteSpace: "nowrap",
   },
 
@@ -540,6 +931,7 @@ const s: Record<string, React.CSSProperties> = {
     color: "#F9FAFB",
     whiteSpace: "nowrap",
   },
+
   btnGhostDark: {
     padding: "10px 12px",
     borderRadius: 999,
@@ -624,19 +1016,8 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     padding: 16,
   },
-  modalFrame: {
-    position: "relative",
-    maxWidth: "min(980px, 100%)",
-    maxHeight: "90vh",
-    width: "100%",
-  },
-  modalImg: {
-    width: "100%",
-    maxHeight: "90vh",
-    objectFit: "contain",
-    borderRadius: 18,
-    backgroundColor: "#000",
-  },
+  modalFrame: { position: "relative", maxWidth: "min(980px, 100%)", maxHeight: "90vh", width: "100%" },
+  modalImg: { width: "100%", maxHeight: "90vh", objectFit: "contain", borderRadius: 18, backgroundColor: "#000" },
   modalClose: {
     position: "absolute",
     top: 10,
@@ -706,8 +1087,8 @@ const s: Record<string, React.CSSProperties> = {
     color: "#111827",
   },
   bottomWhats: {
-    flex: 1.2,
-    maxWidth: 320,
+    flex: 1,
+    maxWidth: 260,
     padding: "12px 14px",
     borderRadius: 999,
     border: "none",
@@ -717,29 +1098,28 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 950,
     fontSize: 12,
   },
-
-  errorCard: {
-    background: "#fff",
-    border: "1px solid #FCA5A5",
-    borderRadius: 18,
-    padding: 14,
+  bottomBlack: {
+    flex: 1,
+    maxWidth: 260,
+    padding: "12px 14px",
+    borderRadius: 999,
+    border: "none",
+    background: "#111827",
+    color: "#fff",
+    fontWeight: 950,
+    fontSize: 12,
   },
+  bottomDisabled: {
+    background: "#9CA3AF",
+    cursor: "not-allowed",
+  },
+
+  errorCard: { background: "#fff", border: "1px solid #FCA5A5", borderRadius: 18, padding: 14 },
   errorTitle: { fontWeight: 1000, color: "#991B1B" },
   errorText: { marginTop: 6, color: "#6B7280" },
 
-  skeletonTop: {
-    height: 380,
-    borderRadius: 18,
-    background: "#ECECEC",
-    border: "1px solid #E5E7EB",
-  },
-  skeletonBody: {
-    marginTop: 12,
-    height: 280,
-    borderRadius: 18,
-    background: "#ECECEC",
-    border: "1px solid #E5E7EB",
-  },
+  skeletonTop: { height: 380, borderRadius: 18, background: "#ECECEC", border: "1px solid #E5E7EB" },
+  skeletonBody: { marginTop: 12, height: 280, borderRadius: 18, background: "#ECECEC", border: "1px solid #E5E7EB" },
 
   toast: {
     position: "fixed",
@@ -758,13 +1138,217 @@ const s: Record<string, React.CSSProperties> = {
     opacity: "0",
     pointerEvents: "none",
   },
-};
 
-function clamp(lines: number): React.CSSProperties {
-  return {
-    display: "-webkit-box",
-    WebkitBoxOrient: "vertical",
-    WebkitLineClamp: lines as any,
+  /* ===== Pro bottom sheet ===== */
+  sheetBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9999,
+    background: "rgba(15,23,42,0.45)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "flex-end",
+    padding: 12,
+  },
+  sheet: {
+    width: "min(720px, 100%)",
+    background: "#fff",
+    borderRadius: 18,
+    border: "1px solid #E5E7EB",
+    boxShadow: "0 24px 90px rgba(0,0,0,0.25)",
     overflow: "hidden",
-  };
-}
+    maxHeight: "88vh",
+    display: "flex",
+    flexDirection: "column",
+  },
+  sheetHeaderPro: {
+    padding: "14px 14px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderBottom: "1px solid #E5E7EB",
+    background: "#fff",
+  },
+  sheetTitle: { fontWeight: 1000, fontSize: 16, color: "#111827" },
+  sheetPillsRow: { marginTop: 6 },
+  sheetPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+    background: "#F5F1EA",
+    border: "1px solid #E7E2D8",
+    color: "#111827",
+  },
+  sheetPillOut: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+    background: "#FEE2E2",
+    border: "1px solid #FCA5A5",
+    color: "#B91C1C",
+  },
+  sheetClosePro: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+    color: "#111827",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: "0 0 auto",
+  },
+  sheetBody: { padding: 14, overflow: "auto", display: "grid", gap: 12 },
+
+  productCard: {
+    borderRadius: 14,
+    border: "1px solid #E5E7EB",
+    background: "#FAFAF9",
+    padding: 12,
+  },
+  productCardLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    fontWeight: 900,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  productCardName: { marginTop: 4, fontSize: 14, fontWeight: 1000, color: "#111827" },
+
+  formGridPro: { display: "grid", gap: 12 },
+  fieldPro: { display: "grid", gap: 6 },
+  labelPro: { fontSize: 12, fontWeight: 900, color: "#111827" },
+  inputPro: {
+    width: "100%",
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    padding: "12px 12px",
+    fontSize: 14,
+    outline: "none",
+    background: "#fff",
+    color: "#111827",
+  },
+  helperPro: { fontSize: 12, color: "#6B7280" },
+
+  qtyRowPro: { display: "grid", gridTemplateColumns: "44px 1fr 44px", gap: 10, alignItems: "center" },
+  qtyBtnPro: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+    fontSize: 18,
+    color: "#111827",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: 1,
+  },
+  qtyInputPro: {
+    width: "100%",
+    height: 44,
+    borderRadius: 14,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    color: "#111827",
+    textAlign: "center",
+    fontWeight: 1000,
+    fontSize: 14,
+    outline: "none",
+  },
+  textareaPro: {
+    width: "100%",
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    padding: "12px 12px",
+    fontSize: 14,
+    minHeight: 96,
+    outline: "none",
+    resize: "vertical",
+    background: "#fff",
+    color: "#111827",
+  },
+  errorPro: { fontSize: 12, color: "#B91C1C", fontWeight: 900 },
+
+  tipCardPro: {
+    display: "flex",
+    gap: 10,
+    alignItems: "flex-start",
+    borderRadius: 14,
+    border: "1px dashed #E5E7EB",
+    background: "#FAFAF9",
+    padding: 12,
+  },
+  tipIconPro: {
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 1000,
+    color: "#111827",
+    flex: "0 0 auto",
+  },
+  tipTitlePro: { fontWeight: 1000, fontSize: 12, color: "#111827" },
+  tipTextPro: { marginTop: 2, fontSize: 12, color: "#6B7280", lineHeight: 1.35 },
+
+  sheetActionsPro: {
+    position: "sticky",
+    bottom: 0,
+    background: "rgba(255,255,255,0.96)",
+    backdropFilter: "blur(10px)",
+    borderTop: "1px solid #E5E7EB",
+    padding: "12px 14px calc(12px + env(safe-area-inset-bottom))",
+    display: "grid",
+    gridTemplateColumns: "1fr 1.35fr",
+    gap: 10,
+  },
+  sheetGhostPro: {
+    height: 44,
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+    color: "#111827",
+  },
+  sheetPrimaryPro: {
+    height: 44,
+    borderRadius: 999,
+    border: "none",
+    background: "#111827",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+  },
+  sheetPrimaryDisabledPro: {
+    background: "#9CA3AF",
+    cursor: "not-allowed",
+  },
+  sheetPrimaryGreenPro: {
+    height: 44,
+    borderRadius: 999,
+    border: "none",
+    background: "#22C55E",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+  },
+
+  okBox: { padding: 12, borderRadius: 14, border: "1px solid #E5E7EB", background: "#F9FAFB" },
+};
