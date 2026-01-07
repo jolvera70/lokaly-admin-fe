@@ -7,8 +7,8 @@ type SellerMe = {
   id: string;
   name: string;
   slug: string;
-  whatsapp?: string; // ideal: 52XXXXXXXXXX
-  description?: string;
+  whatsapp?: string | null;
+  description?: string | null;
 };
 
 function getToken() {
@@ -38,8 +38,8 @@ function normalizeMe(raw: any): SellerMe {
     id: raw.id,
     name: raw.fullName ?? raw.name ?? "",
     slug: raw.slug ?? "",
-    whatsapp: raw.whatsapp ?? "",
-    description: raw.description ?? "",
+    whatsapp: raw.whatsapp ?? undefined,
+    description: raw.description ?? undefined,
   };
 }
 
