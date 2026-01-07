@@ -9,13 +9,7 @@ import type { LoginSuccessPayload } from "./LoginPage";
 import { AdminLayout } from "./AdminLayout";
 
 // Router
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  Outlet,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 
 // Páginas del admin
 import ColoniesPage from "./pages/ColoniesPage";
@@ -25,10 +19,15 @@ import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
 import SellerCheckoutPage from "./pages/SellerCheckoutPage";
 
-// Pública: catálogo
+// Públicas
 import { PublicCatalogPage } from "./pages/public/PublicCatalogPage";
-// Pública: landing nueva
+import { PublicProductPage } from "./pages/public/PublicProductPage";
 import { LandingPage } from "./pages/public/LandingPAge";
+
+// Seller panel (nuevas)
+import SellerProductsPage from "./pages/seller/SellerProductsPage";
+import SellerStatsPage from "./pages/seller/SellerStatsPage";
+import SellerSettingsPage from "./pages/seller/SellerSettingsPage";
 
 type AuthState = {
   token: string;
@@ -52,9 +51,7 @@ function AdminShell({
   auth: AuthState;
   onLogout: () => void;
 }) {
-  if (!auth) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!auth) return <Navigate to="/login" replace />;
 
   return (
     <AdminLayout name={auth.name} onLogout={onLogout}>
@@ -91,15 +88,18 @@ function App() {
         {/* 🌐 Landing pública */}
         <Route path="/" element={<LandingPage />} />
 
-        {/* 🌐 Ruta pública de catálogo */}
+        {/* 🌐 Catálogo público */}
         <Route path="/catalog/:slug" element={<PublicCatalogPage />} />
+
+        {/* 🌐 Detalle público de producto */}
+        <Route path="/p/:productId" element={<PublicProductPage />} />
 
         {/* 🔑 Login admin */}
         <Route
           path="/login"
           element={
             auth ? (
-              <Navigate to="/admin" replace />
+              <Navigate to="/admin/dashboard" replace />
             ) : (
               <LoginPage onLoginSuccess={handleLoginSuccess} />
             )
@@ -107,26 +107,22 @@ function App() {
         />
 
         {/* 🔒 Rutas protegidas admin */}
-        <Route
-          element={<AdminShell auth={auth} onLogout={handleLogout} />}
-        >
+        <Route element={<AdminShell auth={auth} onLogout={handleLogout} />}>
           <Route path="/admin/dashboard" element={<div>Dashboard</div>} />
           <Route path="/admin/clusters" element={<ClustersPage />} />
           <Route path="/admin/colonies" element={<ColoniesSelectorPage />} />
-          <Route
-            path="/admin/colonies/:clusterId"
-            element={<ColoniesPage />}
-          />
+          <Route path="/admin/colonies/:clusterId" element={<ColoniesPage />} />
           <Route path="/admin/signup" element={<NeighborSignupPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
-          <Route
-            path="/admin/seller/checkout"
-            element={<SellerCheckoutPage />}
-          />
-          <Route
-            path="/admin/catalog/:slug"
-            element={<PublicCatalogPage />}
-          />
+          <Route path="/admin/seller/checkout" element={<SellerCheckoutPage />} />
+
+          {/* Admin puede abrir catálogos también */}
+          <Route path="/admin/catalog/:slug" element={<PublicCatalogPage />} />
+
+          {/* 🧑‍💼 Panel vendedor (web) */}
+          <Route path="/admin/seller/products" element={<SellerProductsPage />} />
+          <Route path="/admin/seller/stats" element={<SellerStatsPage />} />
+          <Route path="/admin/seller/settings" element={<SellerSettingsPage />} />
         </Route>
 
         {/* Catch-all */}

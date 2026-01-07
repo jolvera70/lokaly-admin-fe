@@ -1,6 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
-import { PUBLIC_BASE_URL, PUBLIC_ORIGIN } from "../../api.ts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { PUBLIC_BASE_URL, PUBLIC_ORIGIN } from "../../api";
+
+/* =======================
+   Types
+======================= */
 
 type PublicProduct = {
   id: string;
@@ -9,6 +13,7 @@ type PublicProduct = {
   imageUrls: string[];
   shortDescription?: string;
   featured?: boolean;
+  active?: boolean;
 };
 
 type PublicSeller = {
@@ -26,38 +31,56 @@ type PublicCatalogResponse = {
   products: PublicProduct[];
 };
 
-/* ====== URLs Lokaly (ajusta cuando estén listas) ====== */
-
-const ANDROID_APP_URL =
-  "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO: reemplazar
-const IOS_APP_URL = "https://apps.apple.com/app/idXXXXXXXXXX"; // TODO: reemplazar
-const LANDING_URL = "https://lokaly.site"; // TODO: si cambias dominio, ajusta aquí
+/* =======================
+   Helpers
+======================= */
 
 function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
-
-  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
-    return rawUrl;
-  }
-
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
   const path = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
   return `${PUBLIC_ORIGIN}${path}`;
 }
 
-/* ========= Carrusel de imágenes por producto con zoom (simple y seguro) ========= */
+function cleanPhone(phone: string) {
+  return (phone || "").replace(/[^\d]/g, "");
+}
 
-type ProductImageCarouselProps = {
-  images: string[];
-  alt: string;
-};
+function openWhatsApp(phone: string, message: string) {
+  const p = cleanPhone(phone);
+  if (!p) {
+    alert("Este vendedor no tiene WhatsApp configurado.");
+    return;
+  }
+  const url = `https://wa.me/${p}?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
-function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
+function moneyMXN(value: number) {
+  return `$${(value ?? 0).toLocaleString("es-MX")} MXN`;
+}
+
+function clamp(lines: number): React.CSSProperties {
+  return {
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: lines as any,
+    overflow: "hidden",
+  };
+}
+
+/* =======================
+   Image carousel with zoom
+======================= */
+
+function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }) {
   const [index, setIndex] = useState(0);
-  const [isOpen, setIsOpen] = useState(false); // modal
+  const [isOpen, setIsOpen] = useState(false);
 
   if (!images || images.length === 0) return null;
 
   const total = images.length;
+  const current = images[index];
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -69,115 +92,40 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
     setIndex((prev) => (prev + 1) % total);
   };
 
-  const current = images[index];
-
   return (
     <>
-      {/* Carrusel normal en la tarjeta */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          borderRadius: 18,
-          overflow: "hidden",
-          marginBottom: 10,
-          backgroundColor: "#E5E7EB",
-          cursor: "zoom-in",
-        }}
-        onClick={() => setIsOpen(true)}
-      >
+      <div style={s.media} onClick={() => setIsOpen(true)}>
         <img
           src={current}
           alt={alt}
           loading="lazy"
           decoding="async"
-          style={{
-            width: "100%",
-            height: 190,
-            objectFit: "cover",
-            display: "block",
-          }}
+          style={s.mediaImg}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
 
-        {/* Flechas solo si hay más de una imagen */}
         {total > 1 && (
           <>
-            <button
-              onClick={goPrev}
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: 10,
-                transform: "translateY(-50%)",
-                width: 26,
-                height: 26,
-                borderRadius: "999px",
-                border: "none",
-                backgroundColor: "rgba(17,24,39,0.55)",
-                color: "#F9FAFB",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontSize: 16,
-              }}
-            >
+            <button onClick={goPrev} style={s.mediaNavLeft} aria-label="Anterior">
               ‹
             </button>
-
-            <button
-              onClick={goNext}
-              style={{
-                position: "absolute",
-                top: "50%",
-                right: 10,
-                transform: "translateY(-50%)",
-                width: 26,
-                height: 26,
-                borderRadius: "999px",
-                border: "none",
-                backgroundColor: "rgba(17,24,39,0.55)",
-                color: "#F9FAFB",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontSize: 16,
-              }}
-            >
+            <button onClick={goNext} style={s.mediaNavRight} aria-label="Siguiente">
               ›
             </button>
           </>
         )}
 
-        {/* Dots */}
         {total > 1 && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: 8,
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              gap: 5,
-              padding: "4px 8px",
-              borderRadius: 999,
-              backgroundColor: "rgba(17,24,39,0.5)",
-            }}
-          >
+          <div style={s.dots}>
             {images.map((_, i) => (
               <div
                 key={i}
                 style={{
-                  width: i === index ? 10 : 6,
-                  height: 6,
-                  borderRadius: 999,
-                  backgroundColor:
-                    i === index ? "#FACC15" : "rgba(249,250,251,0.6)",
-                  transition: "all 0.2s ease",
+                  ...s.dot,
+                  width: i === index ? 12 : 7,
+                  opacity: i === index ? 1 : 0.6,
                 }}
               />
             ))}
@@ -185,106 +133,20 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
         )}
       </div>
 
-      {/* Modal de zoom */}
       {isOpen && (
-        <div
-          onClick={() => setIsOpen(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9999,
-            backgroundColor: "rgba(15,23,42,0.85)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "relative",
-              maxWidth: "min(900px, 100%)",
-              maxHeight: "90vh",
-              width: "100%",
-            }}
-          >
-            <img
-              src={current}
-              alt={alt}
-              loading="lazy"
-              decoding="async"
-              style={{
-                width: "100%",
-                maxHeight: "90vh",
-                objectFit: "contain",
-                borderRadius: 18,
-                backgroundColor: "#000",
-              }}
-            />
-
-            {/* Botón cerrar */}
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{
-                position: "absolute",
-                top: 10,
-                right: 10,
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                border: "none",
-                backgroundColor: "rgba(15,23,42,0.9)",
-                color: "#F9FAFB",
-                fontSize: 18,
-                cursor: "pointer",
-              }}
-            >
+        <div onClick={() => setIsOpen(false)} style={s.modalBackdrop}>
+          <div onClick={(e) => e.stopPropagation()} style={s.modalFrame}>
+            <img src={current} alt={alt} style={s.modalImg} />
+            <button onClick={() => setIsOpen(false)} style={s.modalClose} aria-label="Cerrar">
               ✕
             </button>
 
-            {/* Flechas dentro del modal */}
             {total > 1 && (
               <>
-                <button
-                  onClick={goPrev}
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: 10,
-                    transform: "translateY(-50%)",
-                    width: 36,
-                    height: 36,
-                    borderRadius: 999,
-                    border: "none",
-                    backgroundColor: "rgba(15,23,42,0.9)",
-                    color: "#F9FAFB",
-                    fontSize: 20,
-                    cursor: "pointer",
-                  }}
-                >
+                <button onClick={goPrev} style={s.modalNavLeft} aria-label="Anterior">
                   ‹
                 </button>
-                <button
-                  onClick={goNext}
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    right: 10,
-                    transform: "translateY(-50%)",
-                    width: 36,
-                    height: 36,
-                    borderRadius: 999,
-                    border: "none",
-                    backgroundColor: "rgba(15,23,42,0.9)",
-                    color: "#F9FAFB",
-                    fontSize: 20,
-                    cursor: "pointer",
-                  }}
-                >
+                <button onClick={goNext} style={s.modalNavRight} aria-label="Siguiente">
                   ›
                 </button>
               </>
@@ -296,187 +158,47 @@ function ProductImageCarousel({ images, alt }: ProductImageCarouselProps) {
   );
 }
 
-/* ========= Sección promo Lokaly (gancho) ========= */
+/* =======================
+   Sorting
+======================= */
 
-type LokalyPromoSectionProps = {
-  clusterName?: string;
-};
+type SortKey = "FEATURED" | "PRICE_ASC" | "PRICE_DESC" | "NAME_ASC";
 
-function LokalyPromoSection({ clusterName }: LokalyPromoSectionProps) {
-  return (
-    <section
-      style={{
-        marginTop: 32,
-        marginBottom: 24,
-        borderRadius: 24,
-        background:
-          "linear-gradient(135deg, #111827 0%, #020617 40%, #1E293B 100%)",
-        color: "#F9FAFB",
-        padding: "18px 18px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 11,
-          padding: "4px 10px",
-          borderRadius: 999,
-          backgroundColor: "rgba(15,23,42,0.8)",
-          border: "1px solid rgba(148,163,184,0.4)",
-          width: "fit-content",
-        }}
-      >
-        <span
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: 999,
-            backgroundColor: "#FACC15",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 11,
-            color: "#111827",
-            fontWeight: 700,
-          }}
-        >
-          L
-        </span>
-        <span>Catálogo creado con Lokaly</span>
-      </div>
+function sortProducts(list: PublicProduct[], sort: SortKey) {
+  const out = [...list];
 
-      <div>
-        <h2
-          style={{
-            margin: "4px 0 4px",
-            fontSize: 18,
-            fontWeight: 800,
-          }}
-        >
-          ¿Quieres un catálogo como este para tus ventas?
-        </h2>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            color: "#E5E7EB",
-          }}
-        >
-          Crea tu tienda en Lokaly, comparte tu link por WhatsApp y vende a tus
-          vecinos en{" "}
-          <strong>
-            {clusterName ? clusterName.toLowerCase() : "tu colonia"}
-          </strong>{" "}
-          sin complicarte.
-        </p>
-      </div>
+  out.sort((a, b) => {
+    if (sort === "FEATURED") {
+      const fa = a.featured ? 1 : 0;
+      const fb = b.featured ? 1 : 0;
+      if (fb !== fa) return fb - fa;
+      return (a.name || "").localeCompare(b.name || "");
+    }
+    if (sort === "PRICE_ASC") return (a.price ?? 0) - (b.price ?? 0);
+    if (sort === "PRICE_DESC") return (b.price ?? 0) - (a.price ?? 0);
+    return (a.name || "").localeCompare(b.name || "");
+  });
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          fontSize: 12,
-          color: "#E5E7EB",
-        }}
-      >
-        <div
-          style={{
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid rgba(148,163,184,0.6)",
-            backgroundColor: "rgba(15,23,42,0.85)",
-          }}
-        >
-          ✅ Catálogo listo en minutos
-        </div>
-        <div
-          style={{
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid rgba(148,163,184,0.6)",
-            backgroundColor: "rgba(15,23,42,0.85)",
-          }}
-        >
-          📲 Comparte tu link por WhatsApp
-        </div>
-        <div
-          style={{
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid rgba(148,163,184,0.6)",
-            backgroundColor: "rgba(15,23,42,0.85)",
-          }}
-        >
-          🏘️ Vende solo entre vecinos o ciudad tu decides
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          marginTop: 2,
-        }}
-      >
-        <button
-          onClick={() => {
-            window.location.href = LANDING_URL;
-          }}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 999,
-            border: "none",
-            fontSize: 12,
-            fontWeight: 700,
-            backgroundColor: "#FACC15",
-            color: "#111827",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Quiero vender en Lokaly
-        </button>
-        <button
-          onClick={() => {
-            const ua = navigator.userAgent || "";
-            const isIOS = /iPad|iPhone|iPod/.test(ua);
-            const storeUrl = isIOS ? IOS_APP_URL : ANDROID_APP_URL;
-            window.location.href = storeUrl;
-          }}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 999,
-            border: "1px solid rgba(249,250,251,0.6)",
-            fontSize: 12,
-            fontWeight: 600,
-            backgroundColor: "transparent",
-            color: "#F9FAFB",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Descargar app Lokaly
-        </button>
-      </div>
-    </section>
-  );
+  return out;
 }
 
-/* ========= Página principal del catálogo ========= */
+/* =======================
+   Page
+======================= */
 
 export function PublicCatalogPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
   const [data, setData] = useState<PublicCatalogResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filters (los de la versión anterior)
+  const [query, setQuery] = useState("");
+  const [searchInDescription, setSearchInDescription] = useState(true);
+  const [onlyFeatured, setOnlyFeatured] = useState(false);
+  const [sort, setSort] = useState<SortKey>("FEATURED");
 
   const loadCatalog = useCallback(async () => {
     if (!slug) return;
@@ -484,14 +206,11 @@ export function PublicCatalogPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`${PUBLIC_BASE_URL}/catalog/${slug}`);
 
-      if (!res.ok) {
-        throw new Error("No se pudo cargar el catálogo.");
-      }
+      const res = await fetch(`${PUBLIC_BASE_URL}/catalog/${slug}`);
+      if (!res.ok) throw new Error("No se pudo cargar el catálogo.");
 
       const raw = await res.json();
-      console.log("RAW CATALOG RESPONSE", raw);
 
       const normalized: PublicCatalogResponse = {
         seller: {
@@ -503,39 +222,37 @@ export function PublicCatalogPage() {
           clusterName: raw.seller.clusterName ?? raw.seller.colonyName,
           whatsapp: raw.seller.whatsapp,
         },
-        products: (raw.products ?? []).map((p: any) => {
-          const rawImages: string[] = Array.isArray(p.imageUrls)
-            ? p.imageUrls
-            : Array.isArray(p.images)
-            ? p.images
-            : [];
+        products: (raw.products ?? [])
+          .map((p: any) => {
+            const rawImages: string[] = Array.isArray(p.imageUrls)
+              ? p.imageUrls
+              : Array.isArray(p.images)
+              ? p.images
+              : [];
 
-          const single =
-            (p.imageUrl as string | undefined) ||
-            (p.image as string | undefined);
+            const single =
+              (p.imageUrl as string | undefined) || (p.image as string | undefined);
 
-          const resolvedImages = [
-            ...rawImages
-              .map((u) => resolveImageUrl(u))
-              .filter(Boolean) as string[],
-          ];
+            const resolvedImages = [
+              ...rawImages.map((u) => resolveImageUrl(u)).filter(Boolean),
+            ] as string[];
 
-          if (single) {
-            const singleResolved = resolveImageUrl(single);
-            if (singleResolved) {
-              resolvedImages.push(singleResolved);
+            if (single) {
+              const s = resolveImageUrl(single);
+              if (s) resolvedImages.push(s);
             }
-          }
 
-          return {
-            id: p.id,
-            name: p.title ?? p.name,
-            price: p.price,
-            imageUrls: resolvedImages,
-            shortDescription: p.shortDescription ?? p.description,
-            featured: !!p.featured,
-          };
-        }),
+            return {
+              id: p.id,
+              name: p.title ?? p.name,
+              price: Number(p.price ?? 0),
+              imageUrls: resolvedImages,
+              shortDescription: p.shortDescription ?? p.description,
+              featured: !!p.featured,
+              active: p.active !== false,
+            } as PublicProduct;
+          })
+          .filter((p: PublicProduct) => p.active !== false),
       };
 
       setData(normalized);
@@ -551,411 +268,647 @@ export function PublicCatalogPage() {
     loadCatalog();
   }, [loadCatalog]);
 
-  const openWhatsApp = () => {
-    if (!data?.seller.whatsapp) {
-      alert("Este vendedor no tiene WhatsApp configurado.");
-      return;
+  const seller = data?.seller;
+
+  async function copyCatalogLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast("Link copiado ✅");
+    } catch {
+      alert("No se pudo copiar. Copia manual: " + window.location.href);
     }
-    const message = encodeURIComponent(
-      "Hola, vi tu catálogo en Lokaly y me interesa tu producto."
+  }
+
+  const openWhatsAppGeneral = () => {
+    if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
+    openWhatsApp(
+      seller.whatsapp,
+      `Hola! Vi tu catálogo (${window.location.href}) y me interesa un producto.`
     );
-    const url = `https://wa.me/${data.seller.whatsapp}?text=${message}`;
-    window.open(url, "_blank");
   };
 
-  const openInApp = (productId?: string) => {
-    if (!data?.seller?.id && !productId) return;
-
-    const path = productId
-      ? `product/${productId}`
-      : `seller/${data!.seller.id}`;
-
-    const schemeUrl = `lokaly://${path}`;
-
-    const ua = navigator.userAgent || "";
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const storeUrl = isIOS ? IOS_APP_URL : ANDROID_APP_URL;
-
-    let pageHidden = false;
-
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        pageHidden = true;
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    const start = Date.now();
-    window.location.href = schemeUrl;
-
-    setTimeout(() => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-
-      const elapsed = Date.now() - start;
-
-      if (!pageHidden && elapsed < 1500) {
-        window.location.href = storeUrl;
-      }
-    }, 1000);
+  const openWhatsAppForProduct = (p: PublicProduct) => {
+    if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
+    const productUrl = `${window.location.origin}/p/${p.id}`;
+    openWhatsApp(
+      seller.whatsapp,
+      `Hola! Me interesa: ${p.name} (${moneyMXN(p.price)}). Link: ${productUrl}`
+    );
   };
 
-  if (loading)
+  const filteredProducts = useMemo(() => {
+    const list = data?.products ?? [];
+    const q = query.trim().toLowerCase();
+
+    let out = list;
+
+    if (onlyFeatured) out = out.filter((p) => !!p.featured);
+
+    if (q) {
+      out = out.filter((p) => {
+        const name = (p.name ?? "").toLowerCase();
+        const desc = (p.shortDescription ?? "").toLowerCase();
+        return searchInDescription ? name.includes(q) || desc.includes(q) : name.includes(q);
+      });
+    }
+
+    return sortProducts(out, sort);
+  }, [data?.products, onlyFeatured, query, searchInDescription, sort]);
+
+  if (loading) {
     return (
-      <div
-        style={{
-          color: "#111827",
-          padding: 40,
-          textAlign: "center",
-          background: "#F5F1EA",
-          minHeight: "100vh",
-        }}
-      >
-        <h2>Cargando catálogo...</h2>
+      <div style={s.page}>
+        <div style={s.container}>
+          <div style={s.skeletonTop} />
+          <div style={s.skeletonGrid} />
+        </div>
       </div>
     );
+  }
 
-  if (error || !data)
+  if (error || !data) {
     return (
-      <div
-        style={{
-          color: "#111827",
-          padding: 40,
-          textAlign: "center",
-          background: "#F5F1EA",
-          minHeight: "100vh",
-        }}
-      >
-        <h2>Error al cargar el catálogo</h2>
-        <p>{error}</p>
+      <div style={s.page}>
+        <div style={s.container}>
+          <div style={s.errorCard}>
+            <div style={s.errorTitle}>Error</div>
+            <div style={s.errorText}>{error}</div>
+            <button onClick={loadCatalog} style={s.btnBlack}>
+              Reintentar
+            </button>
+          </div>
+        </div>
       </div>
     );
-
-  const { seller, products } = data;
-
-  const sortedProducts = [...products].sort((a, b) => {
-    const fa = a.featured ? 1 : 0;
-    const fb = b.featured ? 1 : 0;
-    if (fb !== fa) return fb - fa;
-    return 0;
-  });
+  }
 
   return (
-    <div
-      style={{
-        background: "#F5F1EA",
-        minHeight: "100vh",
-        padding: "24px 16px 40px",
-        display: "flex",
-        justifyContent: "center",
-        color: "#111827",
-      }}
-    >
-      <div style={{ width: "100%", maxWidth: 980 }}>
-        {/* ====== TOP BAR / LOGO ====== */}
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 24,
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                backgroundColor: "#111827",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span
-                style={{
-                  color: "#FACC15",
-                  fontSize: 22,
-                }}
-              >
-                ⌂
-              </span>
+    <div style={s.page}>
+      <div style={s.container}>
+        {/* Header like app */}
+        <header style={s.header}>
+          <div style={s.brandRow}>
+            <div style={s.brandIcon}>⌂</div>
+
+            <div style={{ minWidth: 0 }}>
+              <div style={s.brandTitle}>Lokaly</div>
+              <div style={s.brandSub}>
+                {seller?.clusterName || "Catálogo de"}{" "}
+                <span style={{ opacity: 0.55 }}>· {seller?.name ?? ""}</span>
+              </div>
             </div>
-            <div>
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 18,
-                  lineHeight: 1.1,
-                }}
-              >
-                Lokaly
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#6B7280",
-                }}
-              >
-                {seller.clusterName || "Tu comunidad"}
-              </div>
+
+            <div style={s.headerRight}>
+              <button onClick={copyCatalogLink} style={s.iconBtn} aria-label="Copiar link">
+                ⎘
+              </button>
+              <button onClick={openWhatsAppGeneral} style={s.iconBtn} aria-label="WhatsApp">
+                💬
+              </button>
             </div>
           </div>
 
-          <button
-            onClick={() => (window.location.href = LANDING_URL)}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 999,
-              border: "1px solid #D1D5DB",
-              backgroundColor: "#FFFFFF",
-              fontSize: 11,
-              fontWeight: 500,
-              color: "#374151",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            ¿También vendes aquí?
-          </button>
+          {/* Controls (filtros reales) */}
+          <div style={s.controlsCard}>
+            <div style={s.searchWrap}>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Buscar (ej. "zapato caballero")`}
+                style={s.searchInput}
+              />
+              <label style={s.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={searchInDescription}
+                  onChange={(e) => setSearchInDescription(e.target.checked)}
+                />
+                <span>Buscar también en descripción</span>
+              </label>
+            </div>
+
+            <div style={s.filtersRow}>
+              <button
+                onClick={() => setOnlyFeatured((v) => !v)}
+                style={{
+                  ...s.chip,
+                  ...(onlyFeatured ? s.chipActive : null),
+                }}
+              >
+                {onlyFeatured ? "✓ " : ""}Solo destacados
+              </button>
+
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                style={s.select}
+              >
+                <option value="FEATURED">Orden: destacados</option>
+                <option value="PRICE_ASC">Precio: menor a mayor</option>
+                <option value="PRICE_DESC">Precio: mayor a menor</option>
+                <option value="NAME_ASC">Nombre: A-Z</option>
+              </select>
+
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setSearchInDescription(true);
+                  setOnlyFeatured(false);
+                  setSort("FEATURED");
+                }}
+                style={s.btnGhost}
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
         </header>
 
-        {/* ====== HERO EXPLORAR ====== */}
-        <section style={{ marginBottom: 16 }}>
-          <h1
-            style={{
-              fontSize: 28,
-              fontWeight: 800,
-              margin: 0,
-            }}
-          >
-            Explorar
-          </h1>
-          <p
-            style={{
-              margin: "4px 0 0 0",
-              fontSize: 14,
-              color: "#6B7280",
-            }}
-          >
-            Catálogo de {seller.name}
-          </p>
-        </section>
-
-        {/* ====== CTA COMPRADOR ====== */}
-        <section
-          style={{
-            marginBottom: 20,
-            borderRadius: 20,
-            backgroundColor: "#111827",
-            color: "#F9FAFB",
-            padding: "14px 16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-              }}
-            >
-              ¿Te interesa algo?
+        {/* Grid */}
+        <main style={{ marginTop: 12 }}>
+          {filteredProducts.length === 0 ? (
+            <div style={s.empty}>
+              <div style={s.emptyTitle}>Sin resultados</div>
+              <div style={s.emptyText}>Prueba con otra búsqueda o quita filtros.</div>
             </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "#E5E7EB",
-                marginTop: 2,
-              }}
-            >
-              Envía un mensaje al vendedor por WhatsApp o desde la app Lokaly.
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={openWhatsApp}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "none",
-                fontSize: 11,
-                fontWeight: 600,
-                backgroundColor: "#22C55E",
-                color: "#F9FAFB",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              WhatsApp
-            </button>
-            <button
-              onClick={() => openInApp()}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid",
-                fontSize: 11,
-                fontWeight: 600,
-                backgroundColor: "transparent",
-                color: "#FACC15",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Abrir app
-            </button>
-          </div>
-        </section>
-
-        {/* ====== GRID DE PRODUCTOS ====== */}
-        {sortedProducts.length === 0 ? (
-          <p style={{ color: "#6B7280", marginTop: 16 }}>
-            Este vendedor todavía no tiene productos activos.
-          </p>
-        ) : (
-          <section
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
-              gap: 16,
-            }}
-          >
-            {sortedProducts.map((p) => (
-              <article
-                key={p.id}
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: 24,
-                  padding: 10,
-                  boxShadow:
-                    "0 14px 24px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04)",
-                  display: "flex",
-                  flexDirection: "column",
-                  cursor: "default",
-                }}
-              >
-                {p.imageUrls.length > 0 && (
-                  <ProductImageCarousel images={p.imageUrls} alt={p.name} />
-                )}
-
-                <div style={{ flex: 1 }}>
-                  <h3
-                    style={{
-                      margin: "0 0 4px 0",
-                      fontSize: 15,
-                      fontWeight: 600,
-                      color: "#111827",
-                    }}
-                  >
-                    {p.name}
-                  </h3>
-
-                  {p.shortDescription && (
-                    <p
-                      style={{
-                        margin: "0 0 6px 0",
-                        fontSize: 12,
-                        color: "#6B7280",
-                      }}
-                    >
-                      {p.shortDescription}
-                    </p>
-                  )}
-
-                  <p
-                    style={{
-                      margin: "0 0 4px 0",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: "#111827",
-                    }}
-                  >
-                    ${p.price.toLocaleString("es-MX")} MXN
-                  </p>
-
-                  <div
-                    style={{
-                      marginTop: 2,
-                      display: "flex",
-                      gap: 6,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {p.featured && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#92400E",
-                          backgroundColor: "#FEF3C7",
-                          border: "1px solid #FBBF24",
-                        }}
-                      >
-                        Destacado ✨
-                      </span>
+          ) : (
+            <section style={s.grid}>
+              {filteredProducts.map((p) => (
+                <article key={p.id} style={s.card}>
+                  <div style={{ position: "relative" }}>
+                    {p.imageUrls.length > 0 ? (
+                      <ProductImageCarousel images={p.imageUrls} alt={p.name} />
+                    ) : (
+                      <div style={s.noImg}>Sin imagen</div>
                     )}
 
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: "#16A34A",
-                        backgroundColor: "#DCFCE7",
-                      }}
-                    >
-                      Disponible
-                    </span>
+                    {p.featured && <div style={s.badgeFeatured}>Destacado ✨</div>}
                   </div>
-                </div>
 
-                <button
-                  onClick={() => openInApp(p.id)}
-                  style={{
-                    marginTop: 10,
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    border: "1px solid #E5E7EB",
-                    backgroundColor: "#F9FAFB",
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: "#374151",
-                    cursor: "pointer",
-                    alignSelf: "flex-start",
-                  }}
-                >
-                  Ver en la app Lokaly
-                </button>
-              </article>
-            ))}
-          </section>
-        )}
+                  <div style={s.cardBody}>
+                    <div style={s.cardTitle} title={p.name}>
+                      {p.name}
+                    </div>
 
-        {/* ====== SECCIÓN PROMO LOKALY (GANCHO PARA NUEVOS VENDEDORES) ====== */}
-        <LokalyPromoSection clusterName={seller.clusterName} />
+                    <div style={s.cardPrice}>{moneyMXN(p.price)}</div>
 
-        <footer
-          style={{
-            textAlign: "center",
-            marginTop: 16,
-            color: "#9CA3AF",
-            fontSize: 11,
-          }}
-        >
-          Catálogo creado con Lokaly · Compra y vende entre vecinos
-        </footer>
+                    <div style={s.statusRow}>
+                      <span style={s.statusAvailable}>Disponible</span>
+                    </div>
+
+                    <div style={s.cardActions}>
+                      <button onClick={() => navigate(`/p/${p.id}`)} style={s.btnGhostWide}>
+                        Ver
+                      </button>
+                      <button onClick={() => openWhatsAppForProduct(p)} style={s.btnWhatsWide}>
+                        WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
+        </main>
+
+        <footer style={s.footer}>Catálogo · Lokaly · comparte tu link por WhatsApp</footer>
       </div>
     </div>
   );
 }
+
+/* =======================
+   Tiny toast (sin libs)
+======================= */
+
+let toastTimer: any = null;
+function toast(msg: string) {
+  const elId = "lokaly-toast";
+  let el = document.getElementById(elId);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = elId;
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  Object.assign(el.style, s.toast);
+  el.style.opacity = "1";
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    if (el) el.style.opacity = "0";
+  }, 1100);
+}
+
+/* =======================
+   Styles (app-like light)
+======================= */
+
+const s: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "#F6F6F4",
+    color: "#111827",
+  },
+  container: {
+    maxWidth: 980,
+    margin: "0 auto",
+    padding: "16px 14px 26px",
+  },
+
+  header: {
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
+    background: "#F6F6F4",
+    paddingBottom: 10,
+  },
+
+  brandRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    paddingTop: 4,
+  },
+  brandIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    background: "#111827",
+    color: "#FACC15",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 900,
+  },
+  brandTitle: { fontWeight: 1000, fontSize: 18, lineHeight: 1.1 },
+  brandSub: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+
+  headerRight: { marginLeft: "auto", display: "flex", gap: 8 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontSize: 16,
+  },
+
+  controlsCard: {
+    marginTop: 12,
+    background: "#FFFFFF",
+    border: "1px solid #E5E7EB",
+    borderRadius: 16,
+    padding: 10,
+    boxShadow: "0 10px 22px rgba(17,24,39,0.06)",
+  },
+
+  searchWrap: {
+    borderRadius: 14,
+    background: "#F9FAFB",
+    border: "1px solid #E5E7EB",
+    padding: 10,
+  },
+  searchInput: {
+    width: "100%",
+    border: "none",
+    outline: "none",
+    fontSize: 14,
+    padding: "10px 10px",
+    borderRadius: 12,
+    background: "#FFFFFF",
+  },
+  checkboxRow: {
+    marginTop: 10,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    color: "#111827",
+    fontWeight: 700,
+  },
+
+  filtersRow: {
+    marginTop: 10,
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 0.9fr",
+    gap: 8,
+    alignItems: "center",
+  },
+
+  chip: {
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 12,
+    color: "#111827",
+    whiteSpace: "nowrap",
+  },
+  chipActive: {
+    background: "#F5E7B6",
+    border: "1px solid #E7D28A",
+  },
+
+  select: {
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 12,
+    color: "#111827",
+  },
+
+  btnGhost: {
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 12,
+    color: "#111827",
+  },
+  btnBlack: {
+    marginTop: 10,
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "none",
+    background: "#111827",
+    color: "#F9FAFB",
+    cursor: "pointer",
+    fontWeight: 950,
+  },
+
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 12,
+  },
+
+  card: {
+    background: "#fff",
+    borderRadius: 18,
+    border: "1px solid #E5E7EB",
+    overflow: "hidden",
+    boxShadow: "0 14px 30px rgba(17,24,39,0.08)",
+    display: "flex",
+    flexDirection: "column",
+  },
+
+  cardBody: {
+    padding: 10,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+
+  cardTitle: {
+    fontWeight: 1000,
+    fontSize: 14,
+    color: "#111827",
+    ...clamp(1),
+  },
+
+  cardPrice: {
+    fontWeight: 1000,
+    fontSize: 14,
+    color: "#111827",
+  },
+
+  statusRow: { display: "flex", gap: 8, alignItems: "center" },
+  statusAvailable: { color: "#16A34A", fontWeight: 900, fontSize: 12 },
+
+  badgeFeatured: {
+    position: "absolute",
+    left: 10,
+    bottom: 10,
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+    background: "#F5E7B6",
+    border: "1px solid #E7D28A",
+    color: "#7C5A00",
+  },
+
+  cardActions: { display: "flex", gap: 8, marginTop: 6 },
+  btnGhostWide: {
+    flex: 1,
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 12,
+    color: "#111827",
+  },
+  btnWhatsWide: {
+    flex: 1,
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "none",
+    background: "#22C55E",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 950,
+    fontSize: 12,
+  },
+
+  noImg: {
+    height: 155,
+    background: "#F3F4F6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#9CA3AF",
+    fontWeight: 900,
+  },
+
+  footer: {
+    textAlign: "center",
+    marginTop: 16,
+    color: "#9CA3AF",
+    fontSize: 12,
+  },
+
+  empty: {
+    background: "#fff",
+    border: "1px solid #E5E7EB",
+    borderRadius: 18,
+    padding: 14,
+    boxShadow: "0 14px 30px rgba(17,24,39,0.08)",
+  },
+  emptyTitle: { fontWeight: 1000, fontSize: 16 },
+  emptyText: { marginTop: 6, color: "#6B7280", fontSize: 13 },
+
+  errorCard: {
+    background: "#fff",
+    border: "1px solid #FCA5A5",
+    borderRadius: 18,
+    padding: 14,
+  },
+  errorTitle: { fontWeight: 1000, color: "#991B1B" },
+  errorText: { marginTop: 6, color: "#6B7280" },
+
+  skeletonTop: {
+    height: 180,
+    borderRadius: 18,
+    background: "#ECECEC",
+    border: "1px solid #E5E7EB",
+  },
+  skeletonGrid: {
+    marginTop: 12,
+    height: 420,
+    borderRadius: 18,
+    background: "#ECECEC",
+    border: "1px solid #E5E7EB",
+  },
+
+  /* carousel */
+  media: {
+    position: "relative",
+    width: "100%",
+    backgroundColor: "#F3F4F6",
+    cursor: "zoom-in",
+  },
+  mediaImg: {
+    width: "100%",
+    height: 155,
+    objectFit: "cover",
+    display: "block",
+  },
+  mediaNavLeft: {
+    position: "absolute",
+    top: "50%",
+    left: 8,
+    transform: "translateY(-50%)",
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    border: "none",
+    backgroundColor: "rgba(17,24,39,0.55)",
+    color: "#F9FAFB",
+    cursor: "pointer",
+    fontSize: 16,
+  },
+  mediaNavRight: {
+    position: "absolute",
+    top: "50%",
+    right: 8,
+    transform: "translateY(-50%)",
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    border: "none",
+    backgroundColor: "rgba(17,24,39,0.55)",
+    color: "#F9FAFB",
+    cursor: "pointer",
+    fontSize: 16,
+  },
+  dots: {
+    position: "absolute",
+    bottom: 8,
+    left: "50%",
+    transform: "translateX(-50%)",
+    display: "flex",
+    gap: 5,
+    padding: "4px 8px",
+    borderRadius: 999,
+    backgroundColor: "rgba(17,24,39,0.45)",
+  },
+  dot: {
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: "#FACC15",
+  },
+
+  modalBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9999,
+    backgroundColor: "rgba(15,23,42,0.85)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalFrame: {
+    position: "relative",
+    maxWidth: "min(980px, 100%)",
+    maxHeight: "90vh",
+    width: "100%",
+  },
+  modalImg: {
+    width: "100%",
+    maxHeight: "90vh",
+    objectFit: "contain",
+    borderRadius: 18,
+    backgroundColor: "#000",
+  },
+  modalClose: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    border: "none",
+    backgroundColor: "rgba(15,23,42,0.9)",
+    color: "#F9FAFB",
+    fontSize: 18,
+    cursor: "pointer",
+  },
+  modalNavLeft: {
+    position: "absolute",
+    top: "50%",
+    left: 10,
+    transform: "translateY(-50%)",
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    border: "none",
+    backgroundColor: "rgba(15,23,42,0.9)",
+    color: "#F9FAFB",
+    fontSize: 22,
+    cursor: "pointer",
+  },
+  modalNavRight: {
+    position: "absolute",
+    top: "50%",
+    right: 10,
+    transform: "translateY(-50%)",
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    border: "none",
+    backgroundColor: "rgba(15,23,42,0.9)",
+    color: "#F9FAFB",
+    fontSize: 22,
+    cursor: "pointer",
+  },
+
+  toast: {
+    position: "fixed",
+    left: "50%",
+    bottom: 18,
+    transform: "translateX(-50%)",
+    zIndex: 99999,
+    padding: "10px 14px",
+    borderRadius: 999,
+    background: "rgba(17,24,39,0.9)",
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: "12px",
+    boxShadow: "0 22px 60px rgba(0,0,0,0.25)",
+    transition: "opacity 0.2s ease",
+    opacity: "0",
+    pointerEvents: "none",
+  },
+};
