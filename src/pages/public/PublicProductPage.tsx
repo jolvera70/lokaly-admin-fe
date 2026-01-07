@@ -598,7 +598,7 @@ export function PublicProductPage() {
       };
 
       // Nota: este endpoint es "placeholder" (ajústalo a tu BE real)
-      const res = await fetch(`${PUBLIC_BASE_URL}/order-requests`, {
+      const res = await fetch(`${PUBLIC_BASE_URL}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -700,7 +700,21 @@ export function PublicProductPage() {
                 aria-label="Ver catálogo"
                 title="Ver catálogo"
               >
-                🏬
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#111827"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: "block" }}
+  >
+    <path d="M3 9l1-5h16l1 5" />
+    <path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
+    <path d="M9 21V12h6v9" />
+  </svg>
               </button>
             ) : null}
 
@@ -742,30 +756,8 @@ export function PublicProductPage() {
 
             {data.description ? <p style={s.desc}>{data.description}</p> : <p style={s.descMuted}>Este producto no tiene descripción.</p>}
 
-            {/* Seller strip */}
-            <div style={s.sellerStrip}>
-              <div style={{ minWidth: 0 }}>
-                <div style={s.sellerName}>{data.seller.name}</div>
-                <div style={s.sellerZone}>{data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}</div>
-              </div>
-
-              <button
-                onClick={() => navigate(`/catalog/${data.seller.slug}`)}
-                style={s.btnGhost}
-                disabled={!data.seller.slug}
-                title={!data.seller.slug ? "Catálogo no disponible" : "Ver catálogo"}
-              >
-                Ver catálogo
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <div style={{ height: 110 }} />
-      </div>
-
       {/* Sticky CTA */}
-      <div style={s.bottomBar}>
+      <div style={s.sellerCTA}>
         <button onClick={copyLink} style={s.bottomGhost}>
           Copiar link
         </button>
@@ -780,8 +772,27 @@ export function PublicProductPage() {
           disabled={isOutOfStock}
           title={isOutOfStock ? "Producto agotado" : "Enviar solicitud al vendedor"}
         >
-          {isOutOfStock ? "Agotado" : "Solicitar"}
+          {isOutOfStock ? "Agotado" : "Comprar"}
         </button>
+      </div>   
+            {/* Seller strip */}
+            <div style={s.sellerStrip}>
+              <div style={{ minWidth: 0 }}>
+                <div style={s.sellerName}>{data.seller.name}</div>
+                <div style={s.sellerZone}>{data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}</div>
+              </div>
+
+              <button
+                onClick={() => navigate(`/catalog/${data.seller.slug}`)}
+                style={s.btnGhost}
+                disabled={!data.seller.slug}
+                title={!data.seller.slug ? "Catálogo no disponible" : "Ver catálogo"}
+              >
+                Ver catálogo del vendedor
+              </button>
+            </div>               
+          </div>
+        </section>
       </div>
 
       {/* ✅ Pro sheet */}
@@ -905,6 +916,17 @@ const s: Record<string, React.CSSProperties> = {
 
   desc: { margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.55 },
   descMuted: { margin: 0, fontSize: 14, color: "#9CA3AF", lineHeight: 1.55 },
+  sellerCTA: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 14,
+    background: "#cacfdaff",
+    color: "#F9FAFB",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
 
   sellerStrip: {
     marginTop: 14,

@@ -288,15 +288,6 @@ export function PublicCatalogPage() {
     );
   };
 
-  const openWhatsAppForProduct = (p: PublicProduct) => {
-    if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
-    const productUrl = `${window.location.origin}/p/${p.id}`;
-    openWhatsApp(
-      seller.whatsapp,
-      `Hola! Me interesa: ${p.name} (${moneyMXN(p.price)}). Link: ${productUrl}`
-    );
-  };
-
   const filteredProducts = useMemo(() => {
     const list = data?.products ?? [];
     const q = query.trim().toLowerCase();
@@ -471,10 +462,7 @@ export function PublicCatalogPage() {
 
                     <div style={s.cardActions}>
                       <button onClick={() => navigate(`/p/${p.id}`)} style={s.btnGhostWide}>
-                        Ver
-                      </button>
-                      <button onClick={() => openWhatsAppForProduct(p)} style={s.btnWhatsWide}>
-                        WhatsApp
+                        Ver Detalles
                       </button>
                     </div>
                   </div>
