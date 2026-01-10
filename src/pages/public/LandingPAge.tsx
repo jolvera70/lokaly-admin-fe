@@ -1,801 +1,259 @@
-const MOCK_IMAGES = [
-  "https://images.unsplash.com/photo-1518655048521-f130df041f66?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1505691723518-36a5ac3be353?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1584466977773-e625c37cdd50?auto=format&fit=crop&w=600&q=80",
-];
+import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import "../LandingPage.css";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80";
 
-// 🔗 URLs reales de las tiendas (pon las correctas cuando las tengas)
-const IOS_APP_URL = "https://apps.apple.com/app/idXXXXXXXXX"; // TODO: reemplazar
-const ANDROID_APP_URL =
-  "https://play.google.com/store/apps/details?id=com.tuempresa.lokaly"; // TODO: reemplazar
+// ✅ Imagen principal del hero (grande a la derecha)
+import heroImg from "../../assets/mock/hero-illustration.png";
+import logoMark from "../../assets/brand/lokaly-mark.svg";
 
-export function LandingPage() {
+// ✅ Imágenes pequeñas por step (pueden ser PNG/SVG)
+// Si no tienes 3 aún, puedes repetir heroImg por ahora.
+import step1Img from "../../assets/mock/step-1.png";
+import step2Img from "../../assets/mock/step-2.png";
+import step3Img from "../../assets/mock/step-3.png";
 
+type Step = {
+  key: "publish" | "share" | "sell";
+  title: string;
+  desc: string;
+  detailTitle: string;
+  detailText: string;
+  img: string;
+};
+
+export default function LandingPage() {
+  const navigate = useNavigate();
+
+  const steps: Step[] = useMemo(
+    () => [
+      {
+        key: "publish",
+        title: "Step 1",
+        desc: "Publica tu producto (30 días)",
+        detailTitle: "Publica en 1 minuto",
+        detailText:
+          "Sube una foto, pon el precio y queda visible por 30 días. Puedes pausar, editar o renovar cuando quieras.",
+        img: step1Img,
+      },
+      {
+        key: "share",
+        title: "Step 2",
+        desc: "Comparte tu link por WhatsApp",
+        detailTitle: "Comparte un solo link",
+        detailText:
+          "Envía tu catálogo por WhatsApp a tus clientes. Tus productos quedan ordenados y con el precio claro.",
+        img: step2Img,
+      },
+      {
+        key: "sell",
+        title: "Step 3",
+        desc: "Recibe pedidos directo",
+        detailTitle: "Recibe pedidos por WhatsApp",
+        detailText:
+          "Tus clientes te escriben directo para comprar. Sin comisiones por venta, tú controlas todo.",
+        img: step3Img,
+      },
+    ],
+    []
+  );
+
+  const [activeStep, setActiveStep] = useState(0);
+
+  const prev = useCallback(() => {
+    setActiveStep((s) => (s - 1 + steps.length) % steps.length);
+  }, [steps.length]);
+
+  const next = useCallback(() => {
+    setActiveStep((s) => (s + 1) % steps.length);
+  }, [steps.length]);
+
+  // ✅ Swipe simple para móvil (touch)
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchEndX.current = null;
+    touchStartX.current = e.touches[0].clientX;
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    touchEndX.current = e.touches[0].clientX;
+  }
+
+  function onTouchEnd() {
+    if (touchStartX.current == null || touchEndX.current == null) return;
+    const dx = touchStartX.current - touchEndX.current;
+
+    // umbral de swipe
+    if (dx > 45) next(); // swipe left
+    if (dx < -45) prev(); // swipe right
+  }
+
+  // ✅ Teclas (opcional desktop)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") next();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prev, next]);
+
+  const current = steps[activeStep];
 
   return (
-    <div
-      style={{
-        background: "#F5F1EA",
-        minHeight: "100vh",
-        padding: "32px 16px 40px",
-        display: "flex",
-        justifyContent: "center",
-        color: "#111827",
-      }}
-    >
-      <div style={{ width: "100%", maxWidth: 960 }}>
-        {/* Top bar */}
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 32,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                backgroundColor: "#111827",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span
-                style={{
-                  color: "#FACC15",
-                  fontSize: 22,
-                }}
-              >
-                ⌂
-              </span>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 18,
-                  lineHeight: 1.1,
-                }}
-              >
-                Lokaly
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#6B7280",
-                }}
-              >
-                Catálogos para vender entre vecinos
-              </div>
-            </div>
-          </div>
+    <div className="lp">
+      {/* Header */}
+      <header className="lp__header">
+        <div className="lp__headerInner">
+<button className="lp__brand" onClick={() => navigate("/")}>
+  <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+  <span className="lp__brandText">Lokaly</span>
+</button>
 
-          <nav
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              fontSize: 12,
-            }}
-          >
-            <a
-              href="#beneficios"
-              style={{
-                color: "#4B5563",
-                textDecoration: "none",
-              }}
-            >
-              Beneficios
-            </a>
-            <a
-              href="#como-funciona"
-              style={{
-                color: "#4B5563",
-                textDecoration: "none",
-              }}
-            >
+          <nav className="lp__nav">
+            <Link className="lp__navLink" to="/">
+              Home
+            </Link>
+            <a className="lp__navLink" href="#how">
               Cómo funciona
             </a>
+            <a className="lp__navLink" href="#contact">
+              Contacto
+            </a>
+            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+              Publicar
+            </button>
           </nav>
-        </header>
+        </div>
+      </header>
 
+      <main className="lp__main">
         {/* Hero */}
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
-            gap: 32,
-            alignItems: "center",
-          }}
-        >
-          {/* Texto principal */}
-          <div>
-            {/* Badge contextual (vienen de un catálogo público) */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "4px 10px",
-                borderRadius: 999,
-                backgroundColor: "#FEF3C7",
-                color: "#92400E",
-                fontSize: 11,
-                fontWeight: 600,
-                marginBottom: 8,
-              }}
-            >
-              <span
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 999,
-                  backgroundColor: "#FACC15",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  color: "#111827",
-                }}
-              >
-                ★
-              </span>
-              <span>Viste un catálogo creado con Lokaly</span>
-            </div>
+        <section className="lp__hero">
+          <div className="lp__heroLeft">
+            <div className="lp__kicker">Catálogo para vender por WhatsApp</div>
 
-            <h1
-              style={{
-                margin: "6px 0 10px 0",
-                fontSize: 34,
-                fontWeight: 800,
-                lineHeight: 1.1,
-              }}
-            >
-              Crea tu catálogo
-              <br />
-              y vende en tu colonia.
+            <h1 className="lp__h1">
+              Vende por WhatsApp con un <span className="lp__h1Em">solo link</span>
             </h1>
 
-            <p
-              style={{
-                margin: "0 0 14px 0",
-                fontSize: 15,
-                color: "#4B5563",
-              }}
-            >
-              Lokaly te ayuda a mostrar tus productos con un catálogo elegante,
-              compartir tu link por WhatsApp y recibir pedidos de tus vecinos
-              sin complicarte con tiendas en línea complejas.
+            <p className="lp__subtitle">
+              Publica tu producto en 1 minuto, compártelo en WhatsApp y recibe pedidos directo.
+              Sin apps, sin comisiones.
             </p>
 
-            <ul
-              style={{
-                margin: "0 0 18px 0",
-                paddingLeft: 18,
-                fontSize: 13,
-                color: "#4B5563",
-              }}
-            >
-              <li>Publica tus productos desde la app en minutos.</li>
-              <li>Comparte tu catálogo con un solo link.</li>
-              <li>Vende solo en tu colonia o residencial.</li>
-            </ul>
+            <div className="lp__prices">
+              <div className="lp__priceCard">
+                <div className="lp__priceBig">$14</div>
+                <div className="lp__priceMeta">1 publicación · 30 días</div>
+              </div>
 
-            {/* CTA principal → descarga de la app */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                marginBottom: 12,
-              }}
-            >
-              <a
-                href="#como-funciona"
-                style={{
-                  padding: "11px 18px",
-                  borderRadius: 999,
-                  border: "1px solid #D1D5DB",
-                  backgroundColor: "#FFFFFF",
-                  color: "#111827",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                Ver cómo funciona
-              </a>
+              <div className="lp__priceCard lp__priceCard--featured">
+                <div className="lp__badge">Más vendido</div>
+                <div className="lp__priceBig">$99</div>
+                <div className="lp__priceMeta">10 publicaciones</div>
+                <div className="lp__priceHint">Ahorra vs. pagar $14 c/u</div>
+              </div>
             </div>
 
-            {/* Botones de tienda específicos */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                marginBottom: 10,
-              }}
-            >
-              {/* App Store */}
-              <a
-                href={IOS_APP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 12,
-                  backgroundColor: "#111827",
-                  color: "#fff",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                🍎 Descargar en App Store
-              </a>
-
-              {/* Google Play */}
-              <a
-                href={ANDROID_APP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 12,
-                  backgroundColor: "#111827",
-                  color: "#fff",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                🤖 Descargar en Google Play
-              </a>
+            <div className="lp__ctaRow">
+              <button className="lp__btn lp__btn--primary" onClick={() => navigate("/publicar")}>
+                Publicar mi producto
+              </button>
+              <button className="lp__btn lp__btn--ghost" onClick={() => navigate("/ejemplo")}>
+                Ver ejemplo
+              </button>
             </div>
 
-            <p
-              style={{
-                fontSize: 11,
-                color: "#6B7280",
-              }}
-            >
-              ¿Ya tienes la app? Abre Lokaly en tu teléfono y administra tus
-              productos desde ahí.
-            </p>
+            <div className="lp__micro">
+              ✓ Sin apps <span className="lp__dot">·</span> ✓ Sin mensualidades{" "}
+              <span className="lp__dot">·</span> ✓ 30 días activo
+            </div>
           </div>
 
-          {/* Mockup tipo app: catálogo en el vecindario */}
+          <div className="lp__heroRight" aria-label="Ilustración">
+            <div className="lp__heroArt">
+              <img className="lp__heroImg" src={heroImg} alt="Ilustración Lokaly" />
+            </div>
+          </div>
+        </section>
+
+        {/* Step section */}
+        <section className="lp__how" id="how">
+          {/* Panel que cambia texto/imagen */}
           <div
-            style={{
-              borderRadius: 32,
-              backgroundColor: "#FFF7ED",
-              padding: 16,
-              boxShadow:
-                "0 18px 30px rgba(148, 86, 30,0.15), 0 2px 4px rgba(0,0,0,0.03)",
-            }}
+            className="lp__detail"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
           >
-            {/* Barra superior simulada */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 9,
-                  backgroundColor: "#111827",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <span
-                  style={{
-                    color: "#FACC15",
-                    fontSize: 16,
-                  }}
-                >
-                  ⌂
-                </span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#111827",
-                    marginBottom: 2,
-                  }}
-                >
-                  Catálogo público · Lokaly
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "#6B7280",
-                  }}
-                >
-                  Ejemplo de cómo se ve tu tienda para los vecinos
-                </div>
+            <div className="lp__detailLeft">
+              <div className="lp__detailKicker">Cómo funciona</div>
+              <div className="lp__detailTitle">{current.detailTitle}</div>
+              <div className="lp__detailText">{current.detailText}</div>
+
+              <div className="lp__detailCtas">
+                <button className="lp__btn lp__btn--primary" onClick={() => navigate("/publicar")}>
+                  Publicar ahora
+                </button>
+                <div className="lp__hint">Tip: En celular puedes deslizar ↔️</div>
               </div>
             </div>
 
-            {/* Tarjeta destacada */}
-            <div
-              style={{
-                borderRadius: 22,
-                backgroundColor: "#FFFFFF",
-                padding: 10,
-                marginBottom: 10,
-                boxShadow:
-                  "0 10px 18px rgba(15,23,42,0.10), 0 1px 2px rgba(0,0,0,0.03)",
-              }}
-            >
-              <div
-                style={{
-                  height: 90,
-                  borderRadius: 18,
-                  marginBottom: 8,
-                  backgroundImage: `linear-gradient(135deg, rgba(15,23,42,0.65), rgba(15,23,42,0.2)), url("${HERO_IMAGE}")`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              />
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#111827",
-                    marginBottom: 2,
-                  }}
-                >
-                  Tu catálogo para compartir
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "#6B7280",
-                  }}
-                >
-                  Copia el link y compártelo por WhatsApp, grupos o redes.
-                </div>
+            <div className="lp__detailRight">
+              <div className="lp__detailImgWrap">
+                <img className="lp__detailImg" src={current.img} alt={current.detailTitle} />
               </div>
             </div>
+          </div>
 
-            {/* Grid de productos ejemplo */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 10,
-              }}
-            >
-              {[
-                { name: "Pasteles personalizados", price: "$250 MXN" },
-                { name: "Clases de regularización", price: "$120 MXN" },
-                { name: "Servicios de plomería", price: "$400 MXN" },
-                { name: "Accesorios y ropa", price: "Desde $150 MXN" },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    borderRadius: 18,
-                    backgroundColor: "#FFFFFF",
-                    padding: 6,
-                    boxShadow:
-                      "0 8px 14px rgba(15,23,42,0.06), 0 1px 2px rgba(0,0,0,0.02)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      height: 60,
-                      borderRadius: 14,
-                      backgroundColor: "#E5E7EB",
-                      backgroundImage: `url("${MOCK_IMAGES[idx]}")`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: "#111827",
-                      marginTop: 2,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
+          {/* Step bar */}
+          <div className="lp__stepBar">
+            <div className="lp__stepBarInner">
+              <div className="lp__steps">
+                {steps.map((st, idx) => (
+                  <button
+                    key={st.key}
+                    className={`lp__step ${idx === activeStep ? "is-active" : ""}`}
+                    onClick={() => setActiveStep(idx)}
+                    type="button"
                   >
-                    {item.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 9,
-                      color: "#4B5563",
-                    }}
-                  >
-                    {item.price}
-                  </div>
-                </div>
-              ))}
+                    <div className="lp__stepTitle">{st.title}</div>
+                    <div className="lp__stepDesc">{st.desc}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Flechas: solo desktop (CSS las oculta en móvil) */}
+              <div className="lp__stepNav" aria-label="Navegación de pasos">
+                <button className="lp__circleBtn" onClick={prev} aria-label="Anterior">
+                  ‹
+                </button>
+                <button className="lp__circleBtn" onClick={next} aria-label="Siguiente">
+                  ›
+                </button>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Beneficios principales */}
-        <section
-          id="beneficios"
-          style={{
-            marginTop: 40,
-          }}
-        >
-          <h2
-            style={{
-              margin: "0 0 12px 0",
-              fontSize: 20,
-              fontWeight: 700,
-            }}
-          >
-            Pensado para quienes venden en su colonia
-          </h2>
-          <p
-            style={{
-              margin: "0 0 18px 0",
-              fontSize: 14,
-              color: "#4B5563",
-            }}
-          >
-            Lokaly es ideal para negocios pequeños, emprendedores y vecinos que
-            venden desde casa y quieren verse profesionales sin complicarse.
-          </p>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                borderRadius: 18,
-                backgroundColor: "#FFFFFF",
-                padding: 14,
-                boxShadow: "0 10px 18px rgba(15,23,42,0.05)",
-              }}
-            >
-              <div style={{ fontSize: 20, marginBottom: 6 }}>📲</div>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  marginBottom: 4,
-                }}
-              >
-                Un solo link para todo
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  color: "#4B5563",
-                }}
-              >
-                Comparte tu catálogo en WhatsApp, grupos de vecinos y redes sin
-                mandar fotos una por una.
-              </p>
+        {/* Footer mini */}
+        <footer className="lp__footer" id="contact">
+          <div className="lp__footerInner">
+            <div>
+              <div className="lp__footerBrand">Lokaly</div>
+              <div className="lp__footerMuted">Soporte por WhatsApp</div>
             </div>
-
-            <div
-              style={{
-                borderRadius: 18,
-                backgroundColor: "#FFFFFF",
-                padding: 14,
-                boxShadow: "0 10px 18px rgba(15,23,42,0.05)",
-              }}
-            >
-              <div style={{ fontSize: 20, marginBottom: 6 }}>🏘️</div>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  marginBottom: 4,
-                }}
-              >
-                Vende cerca de ti
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  color: "#4B5563",
-                }}
-              >
-                Diseñado para residenciales, privadas y colonias: vende donde ya
-                tienes confianza.
-              </p>
-            </div>
-
-            <div
-              style={{
-                borderRadius: 18,
-                backgroundColor: "#FFFFFF",
-                padding: 14,
-                boxShadow: "0 10px 18px rgba(15,23,42,0.05)",
-              }}
-            >
-              <div style={{ fontSize: 20, marginBottom: 6 }}>⚡</div>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  marginBottom: 4,
-                }}
-              >
-                Fácil y rápido
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  color: "#4B5563",
-                }}
-              >
-                No necesitas saber de tiendas en línea. Solo sube fotos, precio
-                y descripción desde la app.
-              </p>
+            <div className="lp__footerLinks">
+              <Link to="/terminos">Términos</Link>
+              <Link to="/privacidad">Privacidad</Link>
+              <Link to="/soporte">Soporte</Link>
             </div>
           </div>
-        </section>
-
-        {/* Sección “cómo funciona” */}
-        <section
-          id="como-funciona"
-          style={{
-            marginTop: 40,
-            paddingTop: 16,
-            borderTop: "1px solid #E5E7EB",
-          }}
-        >
-          <h2
-            style={{
-              margin: "0 0 12px 0",
-              fontSize: 20,
-              fontWeight: 700,
-            }}
-          >
-            Crea tu catálogo en 4 pasos
-          </h2>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-              gap: 14,
-              fontSize: 13,
-              color: "#4B5563",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#9CA3AF",
-                  marginBottom: 2,
-                }}
-              >
-                PASO 1
-              </div>
-              <div
-                style={{
-                  fontWeight: 600,
-                  marginBottom: 3,
-                }}
-              >
-                Descarga Lokaly
-              </div>
-              <p style={{ margin: 0 }}>
-                Instala la app desde App Store o Google Play.
-              </p>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#9CA3AF",
-                  marginBottom: 2,
-                }}
-              >
-                PASO 2
-              </div>
-              <div
-                style={{
-                  fontWeight: 600,
-                  marginBottom: 3,
-                }}
-              >
-                Crea tu cuenta
-              </div>
-              <p style={{ margin: 0 }}>
-                Regístrate y elige la colonia o residencial donde vendes.
-              </p>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#9CA3AF",
-                  marginBottom: 2,
-                }}
-              >
-                PASO 3
-              </div>
-              <div
-                style={{
-                  fontWeight: 600,
-                  marginBottom: 3,
-                }}
-              >
-                Publica tus productos
-              </div>
-              <p style={{ margin: 0 }}>
-                Sube fotos, precios y descripciones desde la app.
-              </p>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#9CA3AF",
-                  marginBottom: 2,
-                }}
-              >
-                PASO 4
-              </div>
-              <div
-                style={{
-                  fontWeight: 600,
-                  marginBottom: 3,
-                }}
-              >
-                Comparte tu catálogo
-              </div>
-              <p style={{ margin: 0 }}>
-                Envía tu link por WhatsApp y grupos de vecinos y empieza a
-                vender.
-              </p>
-            </div>
-          </div>
-
-          {/* CTA final → descarga */}
-          <div
-            style={{
-              marginTop: 20,
-              textAlign: "center",
-            }}
-          >
-            <p
-              style={{
-                fontSize: 12,
-                color: "#6B7280",
-                marginBottom: 10,
-              }}
-            >
-              Descarga Lokaly y crea tu catálogo hoy mismo:
-            </p>
-
-            <div
-              style={{
-                display: "inline-flex",
-                gap: 10,
-                flexWrap: "wrap",
-                justifyContent: "center",
-              }}
-            >
-              <a
-                href={IOS_APP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 999,
-                  backgroundColor: "#111827",
-                  color: "#fff",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                🍎 App Store
-              </a>
-              <a
-                href={ANDROID_APP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 999,
-                  backgroundColor: "#111827",
-                  color: "#fff",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                🤖 Google Play
-              </a>
-            </div>
-          </div>
-        </section>
-
-<footer
-  style={{
-    marginTop: 32,
-    fontSize: 11,
-    color: "#9CA3AF",
-    textAlign: "center",
-    lineHeight: 1.6,
-  }}
->
-  <div>Lokaly · Compra y vende entre vecinos</div>
-
-  <div style={{ marginTop: 6 }}>
-    Soporte:&nbsp;
-    <a
-      href="mailto:soporte@lokaly.site"
-      style={{
-        color: "#111827",
-        textDecoration: "none",
-        fontWeight: 600,
-      }}
-    >
-      soporte@lokaly.site
-    </a>
-  </div>
-
-  <div style={{ marginTop: 4 }}>
-    © {new Date().getFullYear()} Lokaly
-  </div>
-</footer>
-      </div>
+        </footer>
+      </main>
     </div>
   );
 }

@@ -1,15 +1,22 @@
 // src/App.tsx
 import { useState } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useLocation,
+} from "react-router-dom";
+
+import { canAccessAdminPanel, canAccessSellerPanel, normalizeRole } from "./auth";
 
 // Login
 import { LoginPage } from "./LoginPage";
 import type { LoginSuccessPayload } from "./LoginPage";
 
-// Layout administrador
+// Layout
 import { AdminLayout } from "./AdminLayout";
-
-// Router
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 
 // Páginas del admin
 import ColoniesPage from "./pages/ColoniesPage";
@@ -18,29 +25,55 @@ import ColoniesSelectorPage from "./pages/ColoniesSelectorPage";
 import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
 import SellerCheckoutPage from "./pages/SellerCheckoutPage";
+import { PublishStartPage } from "./pages/publicar/PublishStartPage";
+import { VerifyOtpPage } from "./pages/publicar/VerifyOtpPage";
+import ProductFormPage from "./pages/publicar/ProductFormPage";
+import PaymentPage from "./pages/publicar/PaymentPage";
+
+
 
 // Públicas
 import { PublicCatalogPage } from "./pages/public/PublicCatalogPage";
 import { PublicProductPage } from "./pages/public/PublicProductPage";
-import { LandingPage } from "./pages/public/LandingPAge";
+import  LandingPage  from "./pages/public/LandingPAge";
 
-// Seller panel (nuevas)
+// Seller panel
 import SellerProductsPage from "./pages/seller/SellerProductsPage";
 import SellerStatsPage from "./pages/seller/SellerStatsPage";
 import SellerSettingsPage from "./pages/seller/SellerSettingsPage";
+import SellerOrdersPage from "./pages/seller/SellerOrdersPage";
 
 type AuthState = {
   token: string;
   name: string;
   role: string;
+  isSeller: boolean;
 } | null;
+
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
 
 function loadInitialAuth(): AuthState {
   const token = localStorage.getItem("lokaly_admin_token");
   const name = localStorage.getItem("lokaly_admin_name");
-  const role = localStorage.getItem("lokaly_admin_role");
-  if (!token || !name || !role) return null;
-  return { token, name, role };
+
+  if (!token || !name) return null;
+
+  const claims = decodeJwtPayload(token);
+  const role = String(claims?.role || "").toUpperCase();
+  const isSeller = claims?.seller === true;
+
+  // Si no hay role en el token, considera sesión inválida
+  if (!role) return null;
+
+  return { token, name, role, isSeller };
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -51,7 +84,23 @@ function AdminShell({
   auth: AuthState;
   onLogout: () => void;
 }) {
+  const location = useLocation();
+
   if (!auth) return <Navigate to="/login" replace />;
+
+  const role = normalizeRole(auth.role);
+  const isSellerArea = location.pathname.startsWith("/admin/seller");
+  const isAdminArea = location.pathname.startsWith("/admin/") && !isSellerArea;
+
+  // ✅ Seller panel: requiere seller=true (o admin)
+  if (isSellerArea && !canAccessSellerPanel(role, auth.isSeller)) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  // ✅ Admin panel: solo admins
+  if (isAdminArea && !canAccessAdminPanel(role)) {
+    return <Navigate to="/admin/seller/orders" replace />;
+  }
 
   return (
     <AdminLayout name={auth.name} onLogout={onLogout}>
@@ -68,10 +117,14 @@ function App() {
     localStorage.setItem("lokaly_admin_name", data.name);
     localStorage.setItem("lokaly_admin_role", data.role);
 
+    // ✅ IMPORTANT: tu LoginSuccessPayload debe traer isSeller:boolean
+    localStorage.setItem("lokaly_is_seller", String(data.seller));
+
     setAuth({
       token: data.accessToken,
       name: data.name,
       role: data.role,
+      isSeller: Boolean(data.seller),
     });
   };
 
@@ -79,6 +132,7 @@ function App() {
     localStorage.removeItem("lokaly_admin_token");
     localStorage.removeItem("lokaly_admin_name");
     localStorage.removeItem("lokaly_admin_role");
+    localStorage.removeItem("lokaly_is_seller");
     setAuth(null);
   };
 
@@ -94,7 +148,12 @@ function App() {
         {/* 🌐 Detalle público de producto */}
         <Route path="/p/:productId" element={<PublicProductPage />} />
 
-        {/* 🔑 Login admin */}
+        <Route path="/publicar" element={<PublishStartPage />} />
+        <Route path="/publicar/verificar" element={<VerifyOtpPage />} />
+        <Route path="/publicar/producto" element={<ProductFormPage />} />
+        <Route path="/publicar/pago" element={<PaymentPage />} />
+
+        {/* 🔑 Login */}
         <Route
           path="/login"
           element={
@@ -106,23 +165,26 @@ function App() {
           }
         />
 
-        {/* 🔒 Rutas protegidas admin */}
+        {/* 🔒 Rutas protegidas */}
         <Route element={<AdminShell auth={auth} onLogout={handleLogout} />}>
           <Route path="/admin/dashboard" element={<div>Dashboard</div>} />
+
+          {/* Admin */}
           <Route path="/admin/clusters" element={<ClustersPage />} />
           <Route path="/admin/colonies" element={<ColoniesSelectorPage />} />
           <Route path="/admin/colonies/:clusterId" element={<ColoniesPage />} />
           <Route path="/admin/signup" element={<NeighborSignupPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
+
+          {/* Seller */}
+          <Route path="/admin/seller/orders" element={<SellerOrdersPage />} />
+          <Route path="/admin/seller/products" element={<SellerProductsPage />} />
+          <Route path="/admin/seller/stats" element={<SellerStatsPage />} />
+          <Route path="/admin/seller/settings" element={<SellerSettingsPage />} />
           <Route path="/admin/seller/checkout" element={<SellerCheckoutPage />} />
 
           {/* Admin puede abrir catálogos también */}
           <Route path="/admin/catalog/:slug" element={<PublicCatalogPage />} />
-
-          {/* 🧑‍💼 Panel vendedor (web) */}
-          <Route path="/admin/seller/products" element={<SellerProductsPage />} />
-          <Route path="/admin/seller/stats" element={<SellerStatsPage />} />
-          <Route path="/admin/seller/settings" element={<SellerSettingsPage />} />
         </Route>
 
         {/* Catch-all */}

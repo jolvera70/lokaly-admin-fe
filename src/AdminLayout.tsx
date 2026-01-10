@@ -46,14 +46,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           />
         </div>
 
-        <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <NavItem label="Dashboard" to="/" exact />
-          <NavItem label="Clusters" to="/admin/clusters" />
-          <NavItem label="Colonias" to="/admin/colonies" />
-          <NavItem label="Usuarios" to="/admin/users" />
-          <NavItem label="Ajustes" to="/admin/settings" />
-          <NavItem label="Checkout" to="/admin/checkout" />
-        </nav>
+<nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+  <NavItem label="Dashboard" to="/admin/dashboard" exact />
+  <NavItem label="Clusters" to="/admin/clusters" />
+  <NavItem label="Colonias" to="/admin/colonies" />
+  <NavItem label="Usuarios" to="/admin/users" />
+
+  <div style={{ height: 10 }} />
+
+  {/* 🧑‍💼 Vendedor */}
+  <NavItem label="Pedidos" to="/admin/seller/orders" />
+  <NavItem label="Productos" to="/admin/seller/products" />
+  <NavItem label="Estadísticas" to="/admin/seller/stats" />
+  <NavItem label="Ajustes vendedor" to="/admin/seller/settings" />
+
+  <div style={{ height: 10 }} />
+
+  <NavItem label="Checkout plan" to="/admin/seller/checkout" />
+</nav>
 
         <div style={{ flexGrow: 1 }} />
 

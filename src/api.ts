@@ -25,29 +25,19 @@ export type NeighborSignupRequest = {
  * ========================= */
 
 // Token del ADMIN (panel web)
-function getAdminAuthHeaders() {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };  
-  const token = localStorage.getItem("lokaly_admin_token");
-  return token
-    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-    : { "Content-Type": "application/json" };
 
-    return headers;
+function getAdminAuthHeaders() {
+  const token = localStorage.getItem("lokaly_admin_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
-// Token del VECINO (solo para pruebas desde web, en móvil usas SecureStore)
 function getNeighborAuthHeaders() {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };  
   const token = localStorage.getItem("neighbor_token");
-  return token
-    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-    : { "Content-Type": "application/json" };
-
-    return headers;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
 /* =========================
@@ -285,4 +275,92 @@ export async function fakeCompleteCheckout(orderId: string) {
 
   if (!res.ok) throw new Error("Error al completar compra");
   return res.json();
+}
+
+
+export type OrderStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "DELIVERED" | "CANCELLED";
+
+export type SellerOrderDto = {
+  id: string;
+  buyerId?: string;
+  buyerName?: string;
+  buyerEmail?: string | null;
+  buyerPhone?: string | null;
+
+  sellerId?: string;
+  sellerName?: string;
+
+  productId?: string;
+  productTitle?: string;
+
+  quantity?: number;
+  note?: string | null;
+
+  unitPrice?: string | number;
+  totalPrice?: string | number;
+
+  status?: OrderStatus;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchSellerOrders(): Promise<SellerOrderDto[]> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/orders/seller`, {
+    headers: {
+      ...getAdminAuthHeaders(),
+      "X-User-Role": "SELLER",
+    },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Error al cargar pedidos del vendedor");
+  }
+  return res.json();
+}
+
+export async function acceptSellerOrder(orderId: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/orders/${orderId}/accept`, {
+    method: "POST",
+    headers: {
+      ...getAdminAuthHeaders(),
+      "X-User-Role": "SELLER",
+    },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "No se pudo aceptar el pedido");
+  }
+}
+
+export async function rejectSellerOrder(orderId: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/orders/${orderId}/reject`, {
+    method: "POST",
+    headers: {
+      ...getAdminAuthHeaders(),
+      "X-User-Role": "SELLER",
+    },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "No se pudo rechazar el pedido");
+  }
+}
+
+export async function markOrderDelivered(orderId: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/orders/${orderId}/status`, {
+    method: "PATCH",
+    headers: {
+      ...getAdminAuthHeaders(),
+      "X-User-Role": "SELLER",
+    },
+    body: JSON.stringify({ status: "DELIVERED" }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "No se pudo marcar como entregado");
+  }
 }

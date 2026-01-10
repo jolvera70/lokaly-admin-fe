@@ -5,13 +5,14 @@ export type LoginSuccessPayload = {
     accessToken: string;
     name: string;
     role: string;
+    seller: boolean;
 };
 
 type LoginPageProps = {
     onLoginSuccess: (data: LoginSuccessPayload) => void;
 };
 
-const API_URL = "https://lokaly.site/api/admin/auth/login";
+const API_URL = "https://lokaly.site/api/public/auth/login";
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState("");
@@ -40,6 +41,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             localStorage.setItem("lokaly_admin_token", data.accessToken);
             localStorage.setItem("lokaly_admin_name", data.name);
             localStorage.setItem("lokaly_admin_role", data.role);
+            localStorage.setItem("lokaly_is_seller", String(data.seller));
 
             onLoginSuccess(data);
         } catch (err: any) {
@@ -83,19 +85,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                         style={{ height: 60, objectFit: "contain" }}
                     />
 
-                    <div
-                        style={{
-                            padding: "4px 10px",
-                            borderRadius: 999,
-                            border: "1px solid rgba(216, 178, 90, 0.45)",
-                            fontSize: 11,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.12em",
-                            color: "#f2d58b",
-                        }}
-                    >
-                        Superadmin
-                    </div>
+<div
+  style={{
+    padding: "4px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(216, 178, 90, 0.45)",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+    color: "#f2d58b",
+  }}
+>
+  Panel Web
+</div>
                 </header>
 
                 <section>
@@ -109,7 +111,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                             color: "#9b9b9b",
                         }}
                     >
-                        Accede al panel de configuración de clusters y colonias.
+                        Accede al panel de administracion.
                     </p>
 
                     <form onSubmit={handleSubmit}>
