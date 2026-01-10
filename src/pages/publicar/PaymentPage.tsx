@@ -5,26 +5,89 @@ import "../LandingPage.css";
 type ProductDraft = {
   phoneE164: string;
   phoneLocal: string;
-  imageFile: File; // no lo usamos aquí para UI, pero viene del flujo
+  imageFile: File;
   imagePreviewUrl: string;
   title: string;
   price: string;
   description: string;
 };
 
-type PlanKey = "ONE" | "PACK10";
-
+type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
 type LocationState = ProductDraft;
 
 function formatMxMoney(n: number) {
-  // sin Intl para evitar inconsistencias, simple:
   return `$${n}`;
 }
 
 function makeCatalogSlugFromPhone(phoneLocal: string) {
-  // simple: ultimos 4
   const last4 = phoneLocal.slice(-4);
   return `mi-catalogo-${last4}`;
+}
+
+type Plan = {
+  key: PlanKey;
+  title: string;
+  subtitle: string;
+  price: number;     // lo que paga hoy
+  credits: number;   // cuántas publicaciones incluye
+  highlight?: "MOST_SOLD" | "BEST_VALUE";
+  blurb: string;
+  bg?: "white" | "blueSoft";
+};
+
+const ONE_PRICE = 14;
+
+const PLANS: Plan[] = [
+  {
+    key: "ONE",
+    title: "1 publicación",
+    subtitle: "30 días activo",
+    price: 14,
+    credits: 1,
+    blurb: "Ideal para probar. Publica un producto y compártelo por WhatsApp.",
+    bg: "white",
+  },
+  {
+    key: "PACK3",
+    title: "Paquete 3",
+    subtitle: "3 publicaciones",
+    price: 39, // 👈 AJUSTA AQUÍ
+    credits: 3,
+    blurb: "Perfecto para iniciar tu mini catálogo (3 productos).",
+    bg: "white",
+  },
+  {
+    key: "PACK5",
+    title: "Paquete 5",
+    subtitle: "5 publicaciones",
+    price: 69, // 👈 AJUSTA AQUÍ
+    credits: 5,
+    blurb: "El punto medio: sube tus más vendidos y comparte un solo link.",
+    bg: "white",
+  },
+  {
+    key: "PACK10",
+    title: "Paquete 10",
+    subtitle: "10 publicaciones",
+    price: 99,
+    credits: 10,
+    highlight: "MOST_SOLD",
+    blurb: "Arma tu catálogo completo y actualízalo cuando quieras.",
+    bg: "blueSoft",
+  },
+];
+
+function savingsText(plan: Plan) {
+  if (plan.credits <= 1) return "";
+  const regular = plan.credits * ONE_PRICE;
+  const save = regular - plan.price;
+  if (save <= 0) return "";
+  return `Ahorras ${formatMxMoney(save)} vs. pagar ${formatMxMoney(ONE_PRICE)} c/u`;
+}
+
+function planLabel(plan: Plan) {
+  if (plan.credits === 1) return "1 publicación · 30 días";
+  return `${plan.credits} publicaciones`;
 }
 
 export default function PaymentPage() {
@@ -32,7 +95,7 @@ export default function PaymentPage() {
   const location = useLocation();
   const draft = (location.state || null) as LocationState | null;
 
-  const [plan, setPlan] = useState<PlanKey>("PACK10");
+  const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -41,41 +104,33 @@ export default function PaymentPage() {
     }
   }, [draft, navigate]);
 
-  const priceToPay = useMemo(() => {
-    return plan === "ONE" ? 14 : 99;
-  }, [plan]);
+  const selectedPlan = useMemo(() => {
+    return PLANS.find((p) => p.key === planKey) ?? PLANS[0];
+  }, [planKey]);
 
-  const planLabel = useMemo(() => {
-    return plan === "ONE" ? "1 publicación · 30 días" : "10 publicaciones";
-  }, [plan]);
-
-  const savingsText = useMemo(() => {
-    // 10 x 14 = 140 vs 99 => ahorro 41
-    if (plan !== "PACK10") return "";
-    const save = 140 - 99;
-    return `Ahorras ${formatMxMoney(save)} vs. pagar $14 c/u`;
-  }, [plan]);
+  const priceToPay = selectedPlan.price;
 
   async function onPay() {
     if (!draft) return;
 
     setLoading(true);
     try {
-      // Aquí iría tu integración real (Stripe, etc):
-      // 1) createCheckout(plan, draft)
+      // TODO real:
+      // 1) createCheckout({ planKey, draftId... })
       // 2) confirmPayment
-      // 3) create publication(s)
+      // 3) activate credits / publish
 
-      // Mock de éxito:
       const slug = makeCatalogSlugFromPhone(draft.phoneLocal);
       const link = `https://lokaly.site/catalog/${slug}`;
 
       navigate("/publicar/listo", {
         state: {
           catalogUrl: link,
-          plan,
+          plan: planKey,
           amountPaid: priceToPay,
           title: draft.title,
+          phoneE164: draft.phoneE164,
+          phoneLocal: draft.phoneLocal,
         },
       });
     } finally {
@@ -111,89 +166,82 @@ export default function PaymentPage() {
           {/* Left */}
           <div className="lp__detailLeft">
             <div className="lp__detailKicker">Pago</div>
-            <div className="lp__detailTitle">Elige tu opción</div>
+            <div className="lp__detailTitle">Elige tu paquete</div>
             <div className="lp__detailText">
               Pagas por publicación. <strong>Sin comisiones por venta.</strong>
             </div>
 
             {/* Plan cards */}
             <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-              {/* Plan 1 */}
-              <button
-                type="button"
-                onClick={() => setPlan("ONE")}
-                style={{
-                  textAlign: "left",
-                  borderRadius: 18,
-                  border: plan === "ONE" ? "2px solid rgba(37,99,235,0.55)" : "1px solid rgba(15,23,42,0.10)",
-                  background: "#fff",
-                  padding: 14,
-                  cursor: "pointer",
-                  boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                  <div style={{ fontWeight: 950, fontSize: 15, color: "#0f172a" }}>
-                    1 publicación — <span style={{ fontSize: 18 }}>{formatMxMoney(14)}</span>
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.60)" }}>
-                    30 días
-                  </div>
-                </div>
-                <div style={{ marginTop: 6, fontSize: 13, color: "rgba(15,23,42,0.65)", lineHeight: 1.4 }}>
-                  Ideal para probar. Publica un producto y compártelo por WhatsApp.
-                </div>
-              </button>
+              {PLANS.map((p) => {
+                const isActive = p.key === planKey;
+                const isBlue = p.bg === "blueSoft";
 
-              {/* Plan 10 */}
-              <button
-                type="button"
-                onClick={() => setPlan("PACK10")}
-                style={{
-                  textAlign: "left",
-                  borderRadius: 18,
-                  border: plan === "PACK10" ? "2px solid rgba(37,99,235,0.55)" : "1px solid rgba(15,23,42,0.10)",
-                  background: "rgba(37,99,235,0.06)",
-                  padding: 14,
-                  cursor: "pointer",
-                  boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
-                  position: "relative",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 12,
-                    right: 12,
-                    fontSize: 12,
-                    fontWeight: 950,
-                    padding: "5px 9px",
-                    borderRadius: 999,
-                    background: "rgba(37,99,235,0.14)",
-                    border: "1px solid rgba(37,99,235,0.20)",
-                    color: "rgba(15,23,42,0.80)",
-                  }}
-                >
-                  ⭐ Más vendido
-                </div>
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setPlanKey(p.key)}
+                    style={{
+                      textAlign: "left",
+                      borderRadius: 18,
+                      border: isActive
+                        ? "2px solid rgba(37,99,235,0.55)"
+                        : "1px solid rgba(15,23,42,0.10)",
+                      background: isBlue ? "rgba(37,99,235,0.06)" : "#fff",
+                      padding: 14,
+                      cursor: "pointer",
+                      boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
+                      position: "relative",
+                    }}
+                  >
+                    {p.highlight ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 12,
+                          right: 12,
+                          fontSize: 12,
+                          fontWeight: 950,
+                          padding: "5px 9px",
+                          borderRadius: 999,
+                          background: "rgba(37,99,235,0.14)",
+                          border: "1px solid rgba(37,99,235,0.20)",
+                          color: "rgba(15,23,42,0.80)",
+                        }}
+                      >
+                        {p.highlight === "MOST_SOLD" ? "⭐ Más vendido" : "🔥 Mejor valor"}
+                      </div>
+                    ) : null}
 
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                  <div style={{ fontWeight: 950, fontSize: 15, color: "#0f172a" }}>
-                    10 publicaciones — <span style={{ fontSize: 18 }}>{formatMxMoney(99)}</span>
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.60)" }}>
-                    Paquete
-                  </div>
-                </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        alignItems: "baseline",
+                      }}
+                    >
+                      <div style={{ fontWeight: 950, fontSize: 15, color: "#0f172a" }}>
+                        {p.title} — <span style={{ fontSize: 18 }}>{formatMxMoney(p.price)}</span>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.60)" }}>
+                        {p.subtitle}
+                      </div>
+                    </div>
 
-                <div style={{ marginTop: 6, fontSize: 13, color: "rgba(15,23,42,0.70)", lineHeight: 1.4 }}>
-                  Publica varios productos y comparte un solo link.
-                </div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "rgba(15,23,42,0.70)", lineHeight: 1.4 }}>
+                      {p.blurb}
+                    </div>
 
-                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.62)" }}>
-                  {savingsText}
-                </div>
-              </button>
+                    {savingsText(p) ? (
+                      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.62)" }}>
+                        {savingsText(p)}
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Pay button */}
@@ -262,7 +310,7 @@ export default function PaymentPage() {
                     }}
                   >
                     <div style={{ fontWeight: 950, marginBottom: 6 }}>Incluye</div>
-                    ✅ {planLabel}
+                    ✅ {planLabel(selectedPlan)}
                     <br />
                     ✅ Link listo para WhatsApp
                     <br />
@@ -281,7 +329,7 @@ export default function PaymentPage() {
                       fontWeight: 800,
                     }}
                   >
-                    Tip: Con paquete de 10 puedes armar tu catálogo completo más rápido.
+                    Tip: Con {selectedPlan.credits > 1 ? `paquete de ${selectedPlan.credits}` : "1 publicación"} puedes armar tu catálogo más rápido.
                   </div>
                 </div>
               </div>
