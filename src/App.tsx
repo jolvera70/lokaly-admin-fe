@@ -29,7 +29,7 @@ import { PublishStartPage } from "./pages/publicar/PublishStartPage";
 import { VerifyOtpPage } from "./pages/publicar/VerifyOtpPage";
 import ProductFormPage from "./pages/publicar/ProductFormPage";
 import PaymentPage from "./pages/publicar/PaymentPage";
-
+import { PublishSuccessPage } from "./pages/publicar/PublishSuccessPage";
 
 
 // Públicas
@@ -152,6 +152,7 @@ function App() {
         <Route path="/publicar/verificar" element={<VerifyOtpPage />} />
         <Route path="/publicar/producto" element={<ProductFormPage />} />
         <Route path="/publicar/pago" element={<PaymentPage />} />
+        <Route path="/publicar/listo" element={<PublishSuccessPage />} />
 
         {/* 🔑 Login */}
         <Route
