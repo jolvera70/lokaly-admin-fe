@@ -2,21 +2,38 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 
+type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
+
 type SuccessState = {
   catalogUrl?: string;
   amountPaid?: number;
-  plan?: "ONE" | "PACK10";
+  plan?: PlanKey;
   title?: string;
+
+  // ✅ créditos (recomendado)
+  credits?: number;          // cuántas publicaciones compró el paquete
+  creditsUsed?: number;      // opcional: cuántas ya usó (si el backend lo manda)
+  creditsLeft?: number;      // opcional: si el backend lo manda directo
 
   // opcional: si quieres permitir "publicar otro" sin pedir OTP otra vez
   phoneE164?: string;
   phoneLocal?: string;
 };
 
-function planLabel(plan?: "ONE" | "PACK10") {
+function planLabel(plan?: PlanKey) {
   if (plan === "ONE") return "1 publicación · 30 días";
-  if (plan === "PACK10") return "10 publicaciones";
+  if (plan === "PACK3") return "3 publicaciones · 30 días";
+  if (plan === "PACK5") return "5 publicaciones · 30 días";
+  if (plan === "PACK10") return "10 publicaciones · 30 días";
   return "Publicación";
+}
+
+function planCreditsFallback(plan?: PlanKey) {
+  if (plan === "ONE") return 1;
+  if (plan === "PACK3") return 3;
+  if (plan === "PACK5") return 5;
+  if (plan === "PACK10") return 10;
+  return 1;
 }
 
 function buildWhatsAppShareLink(catalogUrl: string) {
@@ -48,6 +65,29 @@ export function PublishSuccessPage() {
     return buildWhatsAppShareLink(catalogUrl);
   }, [catalogUrl]);
 
+  // ✅ créditos: preferir lo que venga del backend; si no, calcular con plan
+  const creditsPurchased = useMemo(() => {
+    if (typeof state.credits === "number") return state.credits;
+    return planCreditsFallback(state.plan);
+  }, [state.credits, state.plan]);
+
+  const creditsLeft = useMemo(() => {
+    // prioridad: backend
+    if (typeof state.creditsLeft === "number") return state.creditsLeft;
+
+    // si el backend manda creditsUsed
+    if (typeof state.creditsUsed === "number") {
+      const left = creditsPurchased - state.creditsUsed;
+      return Math.max(0, left);
+    }
+
+    // fallback: asumimos que ya usó 1 (publicó el producto actual)
+    const left = creditsPurchased - 1;
+    return Math.max(0, left);
+  }, [state.creditsLeft, state.creditsUsed, creditsPurchased]);
+
+  const isPack = creditsPurchased > 1;
+
   async function onCopy() {
     if (!catalogUrl) return;
     try {
@@ -68,7 +108,7 @@ export function PublishSuccessPage() {
   }
 
   function onPublishAnother() {
-    // si tienes phone en state, puedes enviarlo y saltarte pedir número (si tu backend lo permite)
+    // ✅ si tienes phone en state, puedes saltarte pedir número (si tu backend lo permite)
     if (state.phoneE164 && state.phoneLocal) {
       navigate("/publicar/producto", {
         state: { phoneE164: state.phoneE164, phoneLocal: state.phoneLocal },
@@ -109,6 +149,36 @@ export function PublishSuccessPage() {
             <div className="lp__detailTitle">🎉 ¡Tu publicación ya está activa!</div>
             <div className="lp__detailText">
               Comparte tu link para empezar a recibir pedidos por WhatsApp.
+            </div>
+
+            {/* ✅ Credits banner */}
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 16,
+                border: "1px solid rgba(15,23,42,0.10)",
+                background: "rgba(37,99,235,0.06)",
+                color: "rgba(15,23,42,0.78)",
+                fontSize: 12,
+                fontWeight: 900,
+                lineHeight: 1.45,
+              }}
+            >
+              {isPack ? (
+                <>
+                  ✅ Te quedan <span style={{ color: "#0f172a" }}>{creditsLeft}</span>{" "}
+                  {creditsLeft === 1 ? "publicación" : "publicaciones"} en tu paquete.
+                  <br />
+                  Tip: aprovecha y sube tus productos más vendidos hoy.
+                </>
+              ) : (
+                <>
+                  ✅ Tu publicación quedará activa 30 días.
+                  <br />
+                  Tip: si vas a subir varios productos, conviene un paquete.
+                </>
+              )}
             </div>
 
             {/* Link box */}
@@ -178,7 +248,7 @@ export function PublishSuccessPage() {
               onClick={onPublishAnother}
               style={{ marginTop: 14, width: "100%" }}
             >
-              ➕ Publicar otro producto
+              ➕ {creditsLeft > 0 ? "Publicar otro producto" : "Publicar otro producto (comprar paquete)"}
             </button>
 
             <button
@@ -210,6 +280,14 @@ export function PublishSuccessPage() {
                   ✅ Plan: <strong>{planLabel(state.plan)}</strong>
                   <br />
                   ✅ Pagaste: <strong>${state.amountPaid ?? "-"}</strong>
+                  <br />
+                  {isPack ? (
+                    <>
+                      ✅ Créditos comprados: <strong>{creditsPurchased}</strong>
+                      <br />
+                      ✅ Te quedan: <strong>{creditsLeft}</strong>
+                    </>
+                  ) : null}
                 </div>
 
                 <div

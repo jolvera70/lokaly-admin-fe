@@ -28,42 +28,43 @@ type Plan = {
   key: PlanKey;
   title: string;
   subtitle: string;
-  price: number;     // lo que paga hoy
-  credits: number;   // cuántas publicaciones incluye
-  highlight?: "MOST_SOLD" | "BEST_VALUE";
+  price: number; // lo que paga hoy
+  credits: number; // cuántas publicaciones incluye
+  highlight?: "MOST_SOLD" | "RECOMMENDED";
   blurb: string;
   bg?: "white" | "blueSoft";
 };
 
-const ONE_PRICE = 14;
+const BASE_PRICE = 16;
 
 const PLANS: Plan[] = [
   {
     key: "ONE",
     title: "1 publicación",
     subtitle: "30 días activo",
-    price: 14,
+    price: 16,
     credits: 1,
-    blurb: "Ideal para probar. Publica un producto y compártelo por WhatsApp.",
+    blurb: "Ideal para probar con un producto.",
     bg: "white",
   },
   {
     key: "PACK3",
     title: "Paquete 3",
     subtitle: "3 publicaciones",
-    price: 39, // 👈 AJUSTA AQUÍ
+    price: 39,
     credits: 3,
-    blurb: "Perfecto para iniciar tu mini catálogo (3 productos).",
+    blurb: "Para empezar bien: sube tus 3 productos más pedidos y comparte un solo link.",
     bg: "white",
   },
   {
     key: "PACK5",
     title: "Paquete 5",
     subtitle: "5 publicaciones",
-    price: 69, // 👈 AJUSTA AQUÍ
+    price: 65,
     credits: 5,
-    blurb: "El punto medio: sube tus más vendidos y comparte un solo link.",
-    bg: "white",
+    highlight: "RECOMMENDED",
+    blurb: "Catálogo real: lo más práctico si vendes seguido (tus más vendidos en un solo link).",
+    bg: "blueSoft",
   },
   {
     key: "PACK10",
@@ -72,22 +73,22 @@ const PLANS: Plan[] = [
     price: 99,
     credits: 10,
     highlight: "MOST_SOLD",
-    blurb: "Arma tu catálogo completo y actualízalo cuando quieras.",
+    blurb: "Todo tu catálogo: publica varios productos y actualiza cuando quieras.",
     bg: "blueSoft",
   },
 ];
 
 function savingsText(plan: Plan) {
   if (plan.credits <= 1) return "";
-  const regular = plan.credits * ONE_PRICE;
+  const regular = plan.credits * BASE_PRICE;
   const save = regular - plan.price;
   if (save <= 0) return "";
-  return `Ahorras ${formatMxMoney(save)} vs. pagar ${formatMxMoney(ONE_PRICE)} c/u`;
+  return `Ahorras ${formatMxMoney(save)} vs. pagar ${formatMxMoney(BASE_PRICE)} c/u`;
 }
 
 function planLabel(plan: Plan) {
   if (plan.credits === 1) return "1 publicación · 30 días";
-  return `${plan.credits} publicaciones`;
+  return `${plan.credits} publicaciones · 30 días`;
 }
 
 export default function PaymentPage() {
@@ -95,6 +96,7 @@ export default function PaymentPage() {
   const location = useLocation();
   const draft = (location.state || null) as LocationState | null;
 
+  // ✅ default recomendado: PACK10 o PACK5 (aquí pongo PACK10, tú decides)
   const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
   const [loading, setLoading] = useState(false);
 
@@ -131,6 +133,7 @@ export default function PaymentPage() {
           title: draft.title,
           phoneE164: draft.phoneE164,
           phoneLocal: draft.phoneLocal,
+          credits: selectedPlan.credits,
         },
       });
     } finally {
@@ -169,6 +172,9 @@ export default function PaymentPage() {
             <div className="lp__detailTitle">Elige tu paquete</div>
             <div className="lp__detailText">
               Pagas por publicación. <strong>Sin comisiones por venta.</strong>
+              <div style={{ marginTop: 6, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
+                Tip: La mayoría de vendedores publica más de 1 producto.
+              </div>
             </div>
 
             {/* Plan cards */}
@@ -176,6 +182,13 @@ export default function PaymentPage() {
               {PLANS.map((p) => {
                 const isActive = p.key === planKey;
                 const isBlue = p.bg === "blueSoft";
+
+                const badge =
+                  p.highlight === "MOST_SOLD"
+                    ? "⭐ Más vendido"
+                    : p.highlight === "RECOMMENDED"
+                    ? "Recomendado"
+                    : "";
 
                 return (
                   <button
@@ -195,7 +208,7 @@ export default function PaymentPage() {
                       position: "relative",
                     }}
                   >
-                    {p.highlight ? (
+                    {badge ? (
                       <div
                         style={{
                           position: "absolute",
@@ -210,7 +223,7 @@ export default function PaymentPage() {
                           color: "rgba(15,23,42,0.80)",
                         }}
                       >
-                        {p.highlight === "MOST_SOLD" ? "⭐ Más vendido" : "🔥 Mejor valor"}
+                        {badge}
                       </div>
                     ) : null}
 
@@ -239,6 +252,24 @@ export default function PaymentPage() {
                         {savingsText(p)}
                       </div>
                     ) : null}
+
+                    {/* Empuje suave en PACK5 */}
+                    {p.key === "PACK5" ? (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: 10,
+                          borderRadius: 14,
+                          border: "1px solid rgba(37,99,235,0.18)",
+                          background: "rgba(255,255,255,0.7)",
+                          fontSize: 12,
+                          fontWeight: 850,
+                          color: "rgba(15,23,42,0.72)",
+                        }}
+                      >
+                        💡 Si tienes varios productos, este es el más práctico.
+                      </div>
+                    ) : null}
                   </button>
                 );
               })}
@@ -262,6 +293,10 @@ export default function PaymentPage() {
 
             <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
               Pago seguro. No cobramos comisión por venta.
+            </div>
+
+            <div style={{ marginTop: 8, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
+              *Precio inicial por lanzamiento. Próximamente sube a $19.
             </div>
           </div>
 
@@ -312,7 +347,7 @@ export default function PaymentPage() {
                     <div style={{ fontWeight: 950, marginBottom: 6 }}>Incluye</div>
                     ✅ {planLabel(selectedPlan)}
                     <br />
-                    ✅ Link listo para WhatsApp
+                    ✅ Un solo link listo para WhatsApp
                     <br />
                     ✅ Sin comisiones por venta
                   </div>
@@ -329,8 +364,31 @@ export default function PaymentPage() {
                       fontWeight: 800,
                     }}
                   >
-                    Tip: Con {selectedPlan.credits > 1 ? `paquete de ${selectedPlan.credits}` : "1 publicación"} puedes armar tu catálogo más rápido.
+                    Tip: Con {selectedPlan.credits > 1 ? `paquete de ${selectedPlan.credits}` : "1 publicación"} armas tu catálogo más rápido.
                   </div>
+                </div>
+
+                {/* Extra: mini tabla de precio por producto */}
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 14,
+                    border: "1px solid rgba(15,23,42,0.10)",
+                    background: "#fff",
+                    fontSize: 12,
+                    color: "rgba(15,23,42,0.70)",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <div style={{ fontWeight: 950, marginBottom: 6 }}>Precio por publicación</div>
+                  {selectedPlan.credits === 1 ? (
+                    <div>• {formatMxMoney(BASE_PRICE)} por producto</div>
+                  ) : (
+                    <div>
+                      • {formatMxMoney(Math.round((selectedPlan.price / selectedPlan.credits) * 10) / 10)} por producto aprox.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,14 +1,13 @@
+// src/pages/public/LandingPage.tsx
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
-
 
 // ✅ Imagen principal del hero (grande a la derecha)
 import heroImg from "../../assets/mock/hero-illustration.png";
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 
-// ✅ Imágenes pequeñas por step (pueden ser PNG/SVG)
-// Si no tienes 3 aún, puedes repetir heroImg por ahora.
+// ✅ Imágenes pequeñas por step
 import step1Img from "../../assets/mock/step-1.png";
 import step2Img from "../../assets/mock/step-2.png";
 import step3Img from "../../assets/mock/step-3.png";
@@ -21,6 +20,19 @@ type Step = {
   detailText: string;
   img: string;
 };
+
+type Plan = {
+  key: "ONE" | "PACK3" | "PACK5" | "PACK10";
+  title: string;
+  price: number;
+  products: number;
+  badge?: string; // "Más vendido" | "Recomendado" | etc.
+  tone?: "plain" | "soft" | "featured";
+};
+
+function formatMxMoney(n: number) {
+  return `$${n}`;
+}
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -58,6 +70,52 @@ export default function LandingPage() {
     []
   );
 
+  // ✅ Pricing strategy: base $16 + packs 3/5/10
+  const BASE_PRICE = 16;
+
+  const plans: Plan[] = useMemo(
+    () => [
+      {
+        key: "ONE",
+        title: "Probar Lokaly",
+        price: 16,
+        products: 1,
+        tone: "plain",
+      },
+      {
+        key: "PACK3",
+        title: "Para empezar bien",
+        price: 39,
+        products: 3,
+        tone: "soft",
+      },
+      {
+        key: "PACK5",
+        title: "Catálogo real",
+        price: 65,
+        products: 5,
+        badge: "Recomendado",
+        tone: "featured",
+      },
+      {
+        key: "PACK10",
+        title: "Todo tu catálogo",
+        price: 99,
+        products: 10,
+        badge: "⭐ Más vendido",
+        tone: "featured",
+      },
+    ],
+    []
+  );
+
+  function savingsText(products: number, price: number) {
+    const full = products * BASE_PRICE;
+    const save = full - price;
+    if (save <= 0) return "";
+    return `Ahorras ${formatMxMoney(save)} vs pagar ${formatMxMoney(BASE_PRICE)} c/u`;
+  }
+
   const [activeStep, setActiveStep] = useState(0);
 
   const prev = useCallback(() => {
@@ -84,10 +142,8 @@ export default function LandingPage() {
   function onTouchEnd() {
     if (touchStartX.current == null || touchEndX.current == null) return;
     const dx = touchStartX.current - touchEndX.current;
-
-    // umbral de swipe
-    if (dx > 45) next(); // swipe left
-    if (dx < -45) prev(); // swipe right
+    if (dx > 45) next();
+    if (dx < -45) prev();
   }
 
   // ✅ Teclas (opcional desktop)
@@ -107,10 +163,10 @@ export default function LandingPage() {
       {/* Header */}
       <header className="lp__header">
         <div className="lp__headerInner">
-<button className="lp__brand" onClick={() => navigate("/")}>
-  <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
-  <span className="lp__brandText">Lokaly</span>
-</button>
+          <button className="lp__brand" onClick={() => navigate("/")}>
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+            <span className="lp__brandText">Lokaly</span>
+          </button>
 
           <nav className="lp__nav">
             <Link className="lp__navLink" to="/">
@@ -144,18 +200,86 @@ export default function LandingPage() {
               Sin apps, sin comisiones.
             </p>
 
+            {/* ✅ Pricing: base + packs */}
             <div className="lp__prices">
-              <div className="lp__priceCard">
-                <div className="lp__priceBig">$14</div>
-                <div className="lp__priceMeta">1 publicación · 30 días</div>
-              </div>
+              {plans.map((p) => {
+                const isFeatured = p.key === "PACK10" || p.key === "PACK5";
+                const save = savingsText(p.products, p.price);
 
-              <div className="lp__priceCard lp__priceCard--featured">
-                <div className="lp__badge">Más vendido</div>
-                <div className="lp__priceBig">$99</div>
-                <div className="lp__priceMeta">10 publicaciones</div>
-                <div className="lp__priceHint">Ahorra vs. pagar $14 c/u</div>
-              </div>
+                return (
+                  <div
+                    key={p.key}
+                    className={[
+                      "lp__priceCard",
+                      isFeatured ? "lp__priceCard--featured" : "",
+                    ].join(" ")}
+                    style={{
+                      // fondo suave para 3/5/10
+                      background:
+                        p.key === "ONE"
+                          ? "#fff"
+                          : p.key === "PACK3"
+                          ? "rgba(37,99,235,0.05)"
+                          : "rgba(37,99,235,0.07)",
+                      borderColor:
+                        p.key === "ONE"
+                          ? "rgba(15, 23, 42, 0.09)"
+                          : "rgba(37,99,235,0.18)",
+                    }}
+                  >
+                    {p.badge ? <div className="lp__badge">{p.badge}</div> : null}
+
+                    <div style={{ fontWeight: 950, fontSize: 14, color: "rgba(15,23,42,0.88)" }}>
+                      {p.title}
+                    </div>
+
+                    <div className="lp__priceBig" style={{ marginTop: 6 }}>
+                      {formatMxMoney(p.price)}
+                    </div>
+
+                    <div className="lp__priceMeta">
+                      {p.products === 1 ? "1 publicación" : `${p.products} publicaciones`} · 30 días
+                    </div>
+
+                    <div className="lp__priceHint" style={{ marginTop: 8 }}>
+                      {p.products === 1
+                        ? "Ideal para probar con un producto."
+                        : "Publica varios productos y compártelos con un solo link."}
+                    </div>
+
+                    {save ? (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: "rgba(15,23,42,0.70)",
+                        }}
+                      >
+                        {save}
+                      </div>
+                    ) : null}
+
+                    {/* micro-empuje */}
+                    {p.key === "PACK5" ? (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: 10,
+                          borderRadius: 14,
+                          border: "1px solid rgba(37,99,235,0.18)",
+                          background: "rgba(255,255,255,0.7)",
+                          fontSize: 12,
+                          fontWeight: 850,
+                          color: "rgba(15,23,42,0.72)",
+                        }}
+                      >
+                        💡 La mayoría publica más de 1 producto.
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="lp__ctaRow">
@@ -168,8 +292,12 @@ export default function LandingPage() {
             </div>
 
             <div className="lp__micro">
-              ✓ Sin apps <span className="lp__dot">·</span> ✓ Sin mensualidades{" "}
+              ✓ Sin apps <span className="lp__dot">·</span> ✓ Sin comisiones{" "}
               <span className="lp__dot">·</span> ✓ 30 días activo
+            </div>
+
+            <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
+              *Precio inicial por lanzamiento. Próximamente sube a $19.
             </div>
           </div>
 
