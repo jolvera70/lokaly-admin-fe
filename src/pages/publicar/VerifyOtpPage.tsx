@@ -2,9 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 
+// ✅ igual que LandingPage
+import logoMark from "../../assets/brand/lokaly-mark.svg";
+
 type LocationState = {
-  phoneE164?: string;   // +524771234567
-  phoneLocal?: string;  // 4771234567
+  phoneE164?: string;
+  phoneLocal?: string;
 };
 
 function onlyDigits(v: string) {
@@ -12,10 +15,9 @@ function onlyDigits(v: string) {
 }
 
 function maskPhoneE164(phoneE164: string) {
-  // +52XXXXXXXXXX -> +52 XXX XXX XX67
   const d = phoneE164.replace("+", "");
   if (d.length < 12) return phoneE164;
-  const local = d.slice(2); // 10
+  const local = d.slice(2);
   return `+52 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)}${local.slice(8)}`;
 }
 
@@ -30,15 +32,12 @@ export function VerifyOtpPage() {
   const [code, setCode] = useState("");
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // reenviar
   const [cooldown, setCooldown] = useState(30);
 
   const codeDigits = useMemo(() => onlyDigits(code).slice(0, 6), [code]);
   const isValid = codeDigits.length === 6;
 
   useEffect(() => {
-    // Si alguien entra directo sin pasar por /publicar
     if (!phoneE164 || !phoneLocal) {
       navigate("/publicar", { replace: true });
       return;
@@ -46,7 +45,6 @@ export function VerifyOtpPage() {
   }, [phoneE164, phoneLocal, navigate]);
 
   useEffect(() => {
-    // countdown
     if (cooldown <= 0) return;
     const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
@@ -59,13 +57,7 @@ export function VerifyOtpPage() {
 
     setLoading(true);
     try {
-      // Aquí llamas tu API real:
-      // await api.verifyOtp({ phone: phoneE164!, code: codeDigits })
-
-      // Si OK -> siguiente pantalla:
-      navigate("/publicar/producto", {
-        state: { phoneE164, phoneLocal },
-      });
+      navigate("/publicar/producto", { state: { phoneE164, phoneLocal } });
     } finally {
       setLoading(false);
     }
@@ -76,9 +68,6 @@ export function VerifyOtpPage() {
 
     setLoading(true);
     try {
-      // Aquí llamas tu API real:
-      // await api.sendOtp({ phone: phoneE164! })
-
       setCooldown(30);
     } finally {
       setLoading(false);
@@ -87,19 +76,23 @@ export function VerifyOtpPage() {
 
   return (
     <div className="lp">
-      {/* Header igual al landing */}
+      {/* ✅ Header IGUAL al LandingPage */}
       <header className="lp__header">
         <div className="lp__headerInner">
           <button className="lp__brand" onClick={() => navigate("/")}>
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
             <span className="lp__brandText">Lokaly</span>
           </button>
 
           <nav className="lp__nav">
-            <Link className="lp__navLink" to="/ejemplo">
-              Ver ejemplo
+            <Link className="lp__navLink" to="/">
+              Home
             </Link>
-            <a className="lp__navLink" href="/#faq">
-              Preguntas
+            <a className="lp__navLink" href="/#how">
+              Cómo funciona
+            </a>
+            <a className="lp__navLink" href="/#contact">
+              Contacto
             </a>
             <button className="lp__navCta" onClick={() => navigate("/publicar")}>
               Publicar
@@ -137,16 +130,21 @@ export function VerifyOtpPage() {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 placeholder="000000"
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(15,23,42,0.14)",
-                  borderRadius: 14,
-                  padding: "12px 14px",
-                  fontSize: 18,
-                  fontWeight: 900,
-                  letterSpacing: "0.18em",
-                  outline: "none",
-                }}
+style={{
+  width: "100%",
+  border: "1px solid rgba(15,23,42,0.14)",
+  borderRadius: 14,
+  padding: "12px 14px",
+  fontSize: 18,
+  fontWeight: 900,
+  letterSpacing: "0.18em",
+  outline: "none",
+
+  background: "#fff",
+  color: "#0f172a",
+  WebkitTextFillColor: "#0f172a", // 🔥 clave para Safari/Chrome
+  appearance: "none",
+}}
               />
 
               {touched && !isValid ? (

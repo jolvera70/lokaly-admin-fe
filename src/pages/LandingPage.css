@@ -7,6 +7,10 @@
   color: #0f172a;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
     "Helvetica Neue", Arial;
+  color-scheme: light;
+
+  /* 🔥 evita scroll horizontal por cualquier desborde */
+  overflow-x: hidden;
 }
 
 /* =========================
@@ -151,7 +155,6 @@
 }
 
 /* Prices */
-/* reemplaza tu .lp__prices */
 .lp__prices {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -279,7 +282,7 @@
 }
 
 /* =========================
-   How / Steps
+   How / Detail Panels
 ========================= */
 .lp__how {
   margin-top: 16px;
@@ -292,10 +295,41 @@
   background: #fff;
   box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
   padding: 16px;
+
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 14px;
-  align-items: center;
+  align-items: start;
+}
+
+/* ✅ FIX: en pantallas medianas ya NO uses 2 columnas (evita encimado OTP) */
+@media (max-width: 1100px) {
+  .lp__detail {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.lp__detailLeft,
+.lp__detailRight {
+  min-width: 0; /* 🔥 clave para que el grid no se rompa */
+}
+
+/* ✅ FIX: el panel derecho NO debe invadir al izquierdo */
+.lp__detailImgWrap {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.02);
+  padding: 12px;
+
+  display: block;      /* en vez de flex-center (reduce overflow) */
+  overflow: hidden;    /* evita que se “salga” y se encime */
+  box-sizing: border-box;
+}
+
+.lp__detailImgWrap > * {
+  max-width: 100%;
 }
 
 .lp__detailKicker {
@@ -317,23 +351,17 @@
   font-size: 14px;
 }
 
-.lp__detailImgWrap {
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(15, 23, 42, 0.02);
-  padding: 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
+/* Si usas imágenes */
 .lp__detailImg {
   width: 100%;
   max-height: 220px;
   object-fit: contain;
+  display: block;
 }
 
-/* Step bar */
+/* =========================
+   Step bar
+========================= */
 .lp__stepBar {
   margin-top: 12px;
   border-radius: 18px;
@@ -396,19 +424,91 @@
 }
 
 /* =========================
-   Responsive
+   Responsive (general)
 ========================= */
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .lp__hero {
     grid-template-columns: 1fr;
   }
   .lp__h1 {
     font-size: 40px;
   }
-  .lp__detail {
-    grid-template-columns: 1fr;
-  }
   .lp__steps {
     grid-template-columns: 1fr;
   }
+}
+
+/* =========================
+   OTP / Inputs fixes (autofill + one-time-code)
+========================= */
+.lp input,
+.lp textarea,
+.lp select {
+  background: #fff !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Chrome/Safari autofill / one-time-code painting */
+.lp input:-webkit-autofill,
+.lp input:-webkit-autofill:hover,
+.lp input:-webkit-autofill:focus,
+.lp input:-webkit-autofill:active {
+  -webkit-text-fill-color: #0f172a !important;
+  box-shadow: 0 0 0 1000px #fff inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* =========================
+   FIX: Nada debe salirse del margen
+   (inputs/buttons con width:100% + border/padding)
+========================= */
+
+/* 1) Border-box en TODO dentro de .lp */
+.lp, .lp * , .lp *::before, .lp *::after {
+  box-sizing: border-box;
+}
+
+/* 2) Asegura que los contenedores no crezcan más que su parent */
+.lp__main,
+.lp__detail,
+.lp__detailLeft,
+.lp__detailRight,
+.lp__detailImgWrap {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 3) Inputs y botones dentro del panel: 100% pero sin overflow */
+.lp__detailLeft input,
+.lp__detailLeft button,
+.lp__detailLeft textarea,
+.lp__detailLeft select {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 4) Evita que textos largos empujen el layout */
+.lp__detail {
+  overflow: hidden; /* solo el contenedor del card */
+}
+
+.lp__detailLeft,
+.lp__detailRight {
+  min-width: 0;
+}
+
+.lp__detailRight * {
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* 5) La fila de "Reenviar / Cambiar" no debe romper márgenes */
+.lp__detailLeft form > div {
+  max-width: 100%;
 }

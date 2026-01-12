@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
+import logoMark from "../../assets/brand/lokaly-mark.svg";
 
 type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
 
@@ -121,25 +122,30 @@ export function PublishSuccessPage() {
   return (
     <div className="lp">
       {/* Header uniforme con landing */}
-      <header className="lp__header">
-        <div className="lp__headerInner">
-          <button className="lp__brand" onClick={() => navigate("/")}>
-            <span className="lp__brandText">Lokaly</span>
-          </button>
+<header className="lp__header">
+  <div className="lp__headerInner">
+    <button className="lp__brand" onClick={() => navigate("/")}>
+      <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+      <span className="lp__brandText">Lokaly</span>
+    </button>
 
-          <nav className="lp__nav">
-            <Link className="lp__navLink" to="/ejemplo">
-              Ver ejemplo
-            </Link>
-            <a className="lp__navLink" href="/#faq">
-              Preguntas
-            </a>
-            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
-              Publicar
-            </button>
-          </nav>
-        </div>
-      </header>
+    <nav className="lp__nav">
+      <Link className="lp__navLink" to="/">
+        Home
+      </Link>
+      <a className="lp__navLink" href="/#how">
+        Cómo funciona
+      </a>
+      <a className="lp__navLink" href="/#contact">
+        Contacto
+      </a>
+      <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+        Publicar
+      </button>
+    </nav>
+  </div>
+</header>
+
 
       <main className="lp__main">
         <section className="lp__detail" style={{ marginTop: 18 }}>
