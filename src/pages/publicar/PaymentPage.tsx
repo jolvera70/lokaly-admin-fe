@@ -209,20 +209,18 @@ export default function PaymentPage() {
                     }}
                   >
                     {badge ? (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 12,
-                          right: 12,
-                          fontSize: 12,
-                          fontWeight: 950,
-                          padding: "5px 9px",
-                          borderRadius: 999,
-                          background: "rgba(37,99,235,0.14)",
-                          border: "1px solid rgba(37,99,235,0.20)",
-                          color: "rgba(15,23,42,0.80)",
-                        }}
-                      >
+<div
+  style={{
+    fontSize: 12,
+    fontWeight: 950,
+    padding: "5px 9px",
+    borderRadius: 999,
+    background: "rgba(37,99,235,0.14)",
+    border: "1px solid rgba(37,99,235,0.20)",
+    color: "rgba(15,23,42,0.80)",
+    whiteSpace: "nowrap",
+  }}
+>
                         {badge}
                       </div>
                     ) : null}
