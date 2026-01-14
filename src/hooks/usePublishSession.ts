@@ -6,6 +6,7 @@ export type PublishSession = {
   phoneLocal: string;
   expiresAt: string;
   verified: boolean;
+  otpSessionId: string;
 };
 
 export function usePublishSession() {

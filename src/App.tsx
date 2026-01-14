@@ -26,7 +26,7 @@ import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
 import SellerCheckoutPage from "./pages/SellerCheckoutPage";
 import { PublishStartPage } from "./pages/publicar/PublishStartPage";
-import VerifyOtpPage  from "./pages/publicar/VerifyOtpPage";
+import VerifyOtpRoutePage from "./pages/publicar/VerifyOtpRoutePage";
 import ProductFormPage from "./pages/publicar/ProductFormPage";
 import PaymentPage from "./pages/publicar/PaymentPage";
 import PublishSuccessPage  from "./pages/publicar/PublishSuccessPage";
@@ -149,7 +149,7 @@ function App() {
         <Route path="/p/:productId" element={<PublicProductPage />} />
 
         <Route path="/publicar" element={<PublishStartPage />} />
-        <Route path="/publicar/verificar" element={<VerifyOtpPage />} />
+        <Route path="/publicar/verificar" element={<VerifyOtpRoutePage />} />
         <Route path="/publicar/producto" element={<ProductFormPage />} />
         <Route path="/publicar/pago" element={<PaymentPage />} />
         <Route path="/publicar/listo" element={<PublishSuccessPage />} />
