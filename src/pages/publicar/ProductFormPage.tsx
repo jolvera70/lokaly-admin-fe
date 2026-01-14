@@ -1,13 +1,10 @@
+// src/pages/publicar/ProductFormPage.tsx
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
-
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 
-type PublishFlowState = {
-  phoneE164?: string;   // +524771234567
-  phoneLocal?: string;  // 4771234567
-};
+import { usePublishGuard } from "../../hooks/usePublishGuard";
 
 type ProductDraft = {
   phoneE164: string;
@@ -15,7 +12,7 @@ type ProductDraft = {
   imageFile: File;
   imagePreviewUrl: string;
   title: string;
-  price: string; // texto para permitir "180" o "180.00"
+  price: string;
   description: string;
 };
 
@@ -24,7 +21,6 @@ function onlyDigits(v: string) {
 }
 
 function sanitizeMoneyInput(v: string) {
-  // Permite 1 punto decimal, máximo 2 decimales
   const cleaned = v.replace(/[^\d.]/g, "");
   const parts = cleaned.split(".");
   const intPart = parts[0] ?? "";
@@ -39,11 +35,11 @@ function isImageFile(file: File) {
 
 export default function ProductFormPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const state = (location.state || {}) as PublishFlowState;
 
-  const phoneE164 = state.phoneE164;
-  const phoneLocal = state.phoneLocal;
+  // ✅ Seguridad real: valida contra el BE (cookie lokaly_pub)
+  const { loading, ok, phoneE164, phoneLocal } = usePublishGuard({
+    redirectTo: "/publicar",
+  });
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -56,16 +52,9 @@ export default function ProductFormPage() {
 
   const [touched, setTouched] = useState(false);
 
-  useEffect(() => {
-    // si entran directo sin pasar por verificación
-    if (!phoneE164 || !phoneLocal) {
-      navigate("/publicar", { replace: true });
-    }
-  }, [phoneE164, phoneLocal, navigate]);
-
+  // ✅ cleanup de preview URL
   useEffect(() => {
     return () => {
-      // limpiar preview url
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
@@ -97,7 +86,6 @@ export default function ProductFormPage() {
       return;
     }
 
-    // limpiar anterior
     if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
 
     setImageFile(file);
@@ -114,7 +102,11 @@ export default function ProductFormPage() {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
+
+    // 🔐 doble seguridad
+    if (!ok) return;
     if (!phoneE164 || !phoneLocal) return;
+
     if (!isValid || !imageFile || !imagePreviewUrl) return;
 
     const draft: ProductDraft = {
@@ -127,40 +119,43 @@ export default function ProductFormPage() {
       description: description.trim(),
     };
 
-    // Siguiente: pago
     navigate("/publicar/pago", { state: draft });
   }
 
+  // mientras carga la sesión del BE
+  if (loading) return null;
+
+  // si no hay sesión válida, el guard ya redirigió
+  if (!ok) return null;
+
   return (
     <div className="lp">
-{/* ✅ Header IGUAL al LandingPage */}
-<header className="lp__header">
-  <div className="lp__headerInner">
-    <button className="lp__brand" onClick={() => navigate("/")}>
-      <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
-      <span className="lp__brandText">Lokaly</span>
-    </button>
+      <header className="lp__header">
+        <div className="lp__headerInner">
+          <button className="lp__brand" onClick={() => navigate("/")}>
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+            <span className="lp__brandText">Lokaly</span>
+          </button>
 
-    <nav className="lp__nav">
-      <Link className="lp__navLink" to="/">
-        Home
-      </Link>
-      <a className="lp__navLink" href="/#how">
-        Cómo funciona
-      </a>
-      <a className="lp__navLink" href="/#contact">
-        Contacto
-      </a>
-      <button className="lp__navCta" onClick={() => navigate("/publicar")}>
-        Publicar
-      </button>
-    </nav>
-  </div>
-</header>
+          <nav className="lp__nav">
+            <Link className="lp__navLink" to="/">
+              Home
+            </Link>
+            <a className="lp__navLink" href="/#how">
+              Cómo funciona
+            </a>
+            <a className="lp__navLink" href="/#contact">
+              Contacto
+            </a>
+            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+              Publicar
+            </button>
+          </nav>
+        </div>
+      </header>
 
       <main className="lp__main">
         <section className="lp__detail" style={{ marginTop: 18 }}>
-          {/* Left: form */}
           <div className="lp__detailLeft">
             <div className="lp__detailKicker">Publica tu producto</div>
             <div className="lp__detailTitle">Crea tu publicación</div>
@@ -256,7 +251,15 @@ export default function ProductFormPage() {
 
               {/* Nombre */}
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 900, color: "rgba(15,23,42,0.75)", marginBottom: 8 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 900,
+                    color: "rgba(15,23,42,0.75)",
+                    marginBottom: 8,
+                  }}
+                >
                   Nombre del producto
                 </label>
                 <input
@@ -283,7 +286,15 @@ export default function ProductFormPage() {
 
               {/* Precio */}
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 900, color: "rgba(15,23,42,0.75)", marginBottom: 8 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 900,
+                    color: "rgba(15,23,42,0.75)",
+                    marginBottom: 8,
+                  }}
+                >
                   Precio
                 </label>
                 <div
@@ -329,7 +340,15 @@ export default function ProductFormPage() {
 
               {/* Descripción */}
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 900, color: "rgba(15,23,42,0.75)", marginBottom: 8 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 900,
+                    color: "rgba(15,23,42,0.75)",
+                    marginBottom: 8,
+                  }}
+                >
                   Descripción (opcional)
                 </label>
                 <textarea
@@ -350,7 +369,6 @@ export default function ProductFormPage() {
                 />
               </div>
 
-              {/* CTA */}
               <button
                 className="lp__btn lp__btn--primary"
                 type="submit"
@@ -370,7 +388,6 @@ export default function ProductFormPage() {
             </form>
           </div>
 
-          {/* Right: mini summary */}
           <div className="lp__detailRight">
             <div className="lp__detailImgWrap">
               <div style={{ width: "100%" }}>

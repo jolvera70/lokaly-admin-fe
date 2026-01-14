@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
-
-// Si ya tienes un logo real:
 import logoMark from "../../assets/brand/lokaly-mark.svg";
+
+import { sendPublicOtp } from "../../api";
+import { loadPublishFlow, savePublishFlow } from "../../publicFlow";
 
 function onlyDigits(v: string) {
   return v.replace(/\D+/g, "");
@@ -28,6 +29,13 @@ export function PublishStartPage() {
   const [phone, setPhone] = useState("");
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // ✅ solo UX: precargar input
+  useEffect(() => {
+    const flow = loadPublishFlow();
+    if (flow?.phoneLocal) setPhone(flow.phoneLocal);
+  }, []);
 
   const normalized = useMemo(() => normalizeMxPhone(phone), [phone]);
   const isValid = normalized.length === 10;
@@ -35,13 +43,36 @@ export function PublishStartPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
+    setErr(null);
     if (!isValid || loading) return;
+
+    const phoneE164 = `+52${normalized}`;
 
     setLoading(true);
     try {
-      navigate("/publicar/verificar", {
-        state: { phoneE164: `+52${normalized}`, phoneLocal: normalized },
+      // ✅ IMPORTANTE: sendPublicOtp debe usar credentials: "include"
+      const resp = await sendPublicOtp(phoneE164);
+
+      // ✅ solo UX (precarga y cache de cooldown), NO seguridad
+      savePublishFlow({
+        phoneE164: resp.phoneE164 ?? phoneE164,
+        phoneLocal: normalized,
+        otpSessionId: resp.otpSessionId,
+        cooldownSeconds: resp.cooldownSeconds ?? 60,
+        verified: false,
       });
+
+      navigate("/publicar/verificar", {
+        replace: true,
+        state: {
+          phoneE164: resp.phoneE164 ?? phoneE164,
+          phoneLocal: normalized,
+          otpSessionId: resp.otpSessionId,
+          cooldownSeconds: resp.cooldownSeconds ?? 60,
+        },
+      });
+    } catch (e: any) {
+      setErr(e?.message || "No se pudo enviar el código. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -49,12 +80,10 @@ export function PublishStartPage() {
 
   return (
     <div className="lp">
-      {/* ✅ Header igual al landing */}
       <header className="lp__header">
         <div className="lp__headerInner">
           <button className="lp__brand" onClick={() => navigate("/")}>
-            {/* Opción con imagen de logo */}
-             <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
             <span className="lp__brandText">Lokaly</span>
           </button>
 
@@ -140,15 +169,12 @@ export function PublishStartPage() {
                 />
               </div>
 
-              {touched && !isValid ? (
-                <div
-                  style={{
-                    marginTop: 8,
-                    fontSize: 12,
-                    color: "rgba(220,38,38,0.95)",
-                    fontWeight: 800,
-                  }}
-                >
+              {err ? (
+                <div style={{ marginTop: 8, fontSize: 12, color: "rgba(220,38,38,0.95)", fontWeight: 800 }}>
+                  {err}
+                </div>
+              ) : touched && !isValid ? (
+                <div style={{ marginTop: 8, fontSize: 12, color: "rgba(220,38,38,0.95)", fontWeight: 800 }}>
                   Ingresa un número válido de 10 dígitos (México).
                 </div>
               ) : (

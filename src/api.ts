@@ -364,3 +364,55 @@ export async function markOrderDelivered(orderId: string): Promise<void> {
     throw new Error(txt || "No se pudo marcar como entregado");
   }
 }
+
+/* =========================
+ * PUBLIC: OTP WhatsApp
+ * ========================= */
+
+export type SendOtpRequest = {
+  phoneE164: string; // "+524771234567"
+  channel: "WHATSAPP";
+};
+
+export type SendOtpResponse = {
+  otpSessionId: string;
+  phoneE164: string;
+  cooldownSeconds: number;
+};
+
+export type VerifyOtpRequest = {
+  otpSessionId: string;
+  code: string; // "123456"
+};
+
+export async function sendPublicOtp(phoneE164: string): Promise<SendOtpResponse> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/v1/otp/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phoneE164, channel: "WHATSAPP" } satisfies SendOtpRequest),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    // tu BE a veces regresa JSON con message; aquí lo dejamos simple
+    throw new Error(text || "Error al enviar OTP");
+  }
+
+  return res.json();
+}
+
+export async function verifyPublicOtp(otpSessionId: string, code: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/v1/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ otpSessionId, code } satisfies VerifyOtpRequest),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "OTP inválido o expirado");
+  }
+
+  // 204 -> no json
+}
+

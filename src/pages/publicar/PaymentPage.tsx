@@ -1,8 +1,11 @@
+// src/pages/publicar/PaymentPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 
 import logoMark from "../../assets/brand/lokaly-mark.svg";
+import { usePublishGuard } from "../../hooks/usePublishGuard";
+
 type ProductDraft = {
   phoneE164: string;
   phoneLocal: string;
@@ -29,8 +32,8 @@ type Plan = {
   key: PlanKey;
   title: string;
   subtitle: string;
-  price: number; // lo que paga hoy
-  credits: number; // cuántas publicaciones incluye
+  price: number;
+  credits: number;
   highlight?: "MOST_SOLD" | "RECOMMENDED";
   blurb: string;
   bg?: "white" | "blueSoft";
@@ -97,15 +100,21 @@ export default function PaymentPage() {
   const location = useLocation();
   const draft = (location.state || null) as LocationState | null;
 
-  // ✅ default recomendado: PACK10 o PACK5 (aquí pongo PACK10, tú decides)
-  const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
-  const [loading, setLoading] = useState(false);
+  // ✅ Seguridad real: valida contra el BE (cookie lokaly_pub)
+  const { loading: guardLoading, ok } = usePublishGuard({
+    redirectTo: "/publicar",
+  });
 
   useEffect(() => {
+    if (guardLoading) return;
+    if (!ok) return; // el guard ya redirigió
     if (!draft?.phoneE164 || !draft?.phoneLocal || !draft?.title || !draft?.price) {
-      navigate("/publicar", { replace: true });
+      navigate("/publicar/producto", { replace: true });
     }
-  }, [draft, navigate]);
+  }, [guardLoading, ok, draft, navigate]);
+
+  const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
+  const [loading, setLoading] = useState(false);
 
   const selectedPlan = useMemo(() => {
     return PLANS.find((p) => p.key === planKey) ?? PLANS[0];
@@ -118,11 +127,6 @@ export default function PaymentPage() {
 
     setLoading(true);
     try {
-      // TODO real:
-      // 1) createCheckout({ planKey, draftId... })
-      // 2) confirmPayment
-      // 3) activate credits / publish
-
       const slug = makeCatalogSlugFromPhone(draft.phoneLocal);
       const link = `https://lokaly.site/catalog/${slug}`;
 
@@ -142,37 +146,38 @@ export default function PaymentPage() {
     }
   }
 
+  if (guardLoading) return null;
+  if (!ok) return null;
+  if (!draft) return null;
+
   return (
     <div className="lp">
-      {/* Header uniforme con landing */}
-{/* ✅ Header IGUAL al LandingPage */}
-<header className="lp__header">
-  <div className="lp__headerInner">
-    <button className="lp__brand" onClick={() => navigate("/")}>
-      <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
-      <span className="lp__brandText">Lokaly</span>
-    </button>
+      <header className="lp__header">
+        <div className="lp__headerInner">
+          <button className="lp__brand" onClick={() => navigate("/")}>
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+            <span className="lp__brandText">Lokaly</span>
+          </button>
 
-    <nav className="lp__nav">
-      <Link className="lp__navLink" to="/">
-        Home
-      </Link>
-      <a className="lp__navLink" href="/#how">
-        Cómo funciona
-      </a>
-      <a className="lp__navLink" href="/#contact">
-        Contacto
-      </a>
-      <button className="lp__navCta" onClick={() => navigate("/publicar")}>
-        Publicar
-      </button>
-    </nav>
-  </div>
-</header>
+          <nav className="lp__nav">
+            <Link className="lp__navLink" to="/">
+              Home
+            </Link>
+            <a className="lp__navLink" href="/#how">
+              Cómo funciona
+            </a>
+            <a className="lp__navLink" href="/#contact">
+              Contacto
+            </a>
+            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+              Publicar
+            </button>
+          </nav>
+        </div>
+      </header>
 
       <main className="lp__main">
         <section className="lp__detail" style={{ marginTop: 18 }}>
-          {/* Left */}
           <div className="lp__detailLeft">
             <div className="lp__detailKicker">Pago</div>
             <div className="lp__detailTitle">Elige tu paquete</div>
@@ -183,7 +188,6 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            {/* Plan cards */}
             <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
               {PLANS.map((p) => {
                 const isActive = p.key === planKey;
@@ -215,30 +219,25 @@ export default function PaymentPage() {
                     }}
                   >
                     {badge ? (
-<div
-  style={{
-    fontSize: 12,
-    fontWeight: 950,
-    padding: "5px 9px",
-    borderRadius: 999,
-    background: "rgba(37,99,235,0.14)",
-    border: "1px solid rgba(37,99,235,0.20)",
-    color: "rgba(15,23,42,0.80)",
-    whiteSpace: "nowrap",
-  }}
->
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 950,
+                          padding: "5px 9px",
+                          borderRadius: 999,
+                          background: "rgba(37,99,235,0.14)",
+                          border: "1px solid rgba(37,99,235,0.20)",
+                          color: "rgba(15,23,42,0.80)",
+                          whiteSpace: "nowrap",
+                          display: "inline-block",
+                          marginBottom: 8,
+                        }}
+                      >
                         {badge}
                       </div>
                     ) : null}
 
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 10,
-                        alignItems: "baseline",
-                      }}
-                    >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
                       <div style={{ fontWeight: 950, fontSize: 15, color: "#0f172a" }}>
                         {p.title} — <span style={{ fontSize: 18 }}>{formatMxMoney(p.price)}</span>
                       </div>
@@ -257,7 +256,6 @@ export default function PaymentPage() {
                       </div>
                     ) : null}
 
-                    {/* Empuje suave en PACK5 */}
                     {p.key === "PACK5" ? (
                       <div
                         style={{
@@ -279,17 +277,16 @@ export default function PaymentPage() {
               })}
             </div>
 
-            {/* Pay button */}
             <button
               className="lp__btn lp__btn--primary"
               type="button"
               onClick={onPay}
-              disabled={loading || !draft}
+              disabled={loading}
               style={{
                 marginTop: 14,
                 width: "100%",
-                opacity: loading || !draft ? 0.7 : 1,
-                cursor: loading || !draft ? "not-allowed" : "pointer",
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
               {loading ? "Procesando pago..." : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
@@ -304,13 +301,12 @@ export default function PaymentPage() {
             </div>
           </div>
 
-          {/* Right */}
           <div className="lp__detailRight">
             <div className="lp__detailImgWrap">
               <div style={{ width: "100%" }}>
                 <div style={{ fontWeight: 950, marginBottom: 10 }}>Resumen</div>
 
-                {draft?.imagePreviewUrl ? (
+                {draft.imagePreviewUrl ? (
                   <div
                     style={{
                       borderRadius: 16,
@@ -328,11 +324,9 @@ export default function PaymentPage() {
                 ) : null}
 
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ fontWeight: 950, fontSize: 14, color: "#0f172a" }}>
-                    {draft?.title || "Tu producto"}
-                  </div>
+                  <div style={{ fontWeight: 950, fontSize: 14, color: "#0f172a" }}>{draft.title || "Tu producto"}</div>
                   <div style={{ marginTop: 2, fontSize: 13, color: "rgba(15,23,42,0.65)", fontWeight: 850 }}>
-                    ${draft?.price || "0"}
+                    ${draft.price || "0"}
                   </div>
 
                   <div
@@ -372,7 +366,6 @@ export default function PaymentPage() {
                   </div>
                 </div>
 
-                {/* Extra: mini tabla de precio por producto */}
                 <div
                   style={{
                     marginTop: 12,

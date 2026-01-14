@@ -29,7 +29,7 @@ import { PublishStartPage } from "./pages/publicar/PublishStartPage";
 import { VerifyOtpPage } from "./pages/publicar/VerifyOtpPage";
 import ProductFormPage from "./pages/publicar/ProductFormPage";
 import PaymentPage from "./pages/publicar/PaymentPage";
-import { PublishSuccessPage } from "./pages/publicar/PublishSuccessPage";
+import PublishSuccessPage  from "./pages/publicar/PublishSuccessPage";
 
 
 // Públicas

@@ -1,7 +1,9 @@
+// src/pages/publicar/PublishSuccessPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 import logoMark from "../../assets/brand/lokaly-mark.svg";
+import { usePublishGuard } from "../../hooks/usePublishGuard";
 
 type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
 
@@ -12,11 +14,11 @@ type SuccessState = {
   title?: string;
 
   // ✅ créditos (recomendado)
-  credits?: number;          // cuántas publicaciones compró el paquete
-  creditsUsed?: number;      // opcional: cuántas ya usó (si el backend lo manda)
-  creditsLeft?: number;      // opcional: si el backend lo manda directo
+  credits?: number; // cuántas publicaciones compró el paquete
+  creditsUsed?: number; // opcional: cuántas ya usó (si el backend lo manda)
+  creditsLeft?: number; // opcional: si el backend lo manda directo
 
-  // opcional: si quieres permitir "publicar otro" sin pedir OTP otra vez
+  // (opcional) NO usar como fuente de verdad para seguridad
   phoneE164?: string;
   phoneLocal?: string;
 };
@@ -46,20 +48,30 @@ function buildWhatsAppShareLink(catalogUrl: string) {
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
-export function PublishSuccessPage() {
+export default function PublishSuccessPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as SuccessState;
+
+  // ✅ Gate: requiere cookie/sesión válida (expireAt no vencida)
+  // (tu hook ya redirige a /publicar si no hay sesión válida)
+  const { ok, phoneE164, phoneLocal, loading } = usePublishGuard({
+    redirectTo: "/publicar",
+  });
 
   const [copied, setCopied] = useState(false);
 
   const catalogUrl = state.catalogUrl;
 
+  // ✅ Si pasas el gate pero entraste sin state (refresh/direct)
   useEffect(() => {
+    if (loading) return;
+    if (!ok) return; // el guard ya redirige
     if (!catalogUrl) {
-      navigate("/", { replace: true });
+      // recomendado: regresar a producto para rehacer el paso anterior
+      navigate("/publicar/producto", { replace: true });
     }
-  }, [catalogUrl, navigate]);
+  }, [loading, ok, catalogUrl, navigate]);
 
   const shareLink = useMemo(() => {
     if (!catalogUrl) return "";
@@ -109,43 +121,49 @@ export function PublishSuccessPage() {
   }
 
   function onPublishAnother() {
-    // ✅ si tienes phone en state, puedes saltarte pedir número (si tu backend lo permite)
-    if (state.phoneE164 && state.phoneLocal) {
+    // ✅ usar datos “confiables” del guard (no de location.state)
+    if (phoneE164 && phoneLocal) {
       navigate("/publicar/producto", {
-        state: { phoneE164: state.phoneE164, phoneLocal: state.phoneLocal },
+        state: { phoneE164, phoneLocal },
       });
       return;
     }
     navigate("/publicar");
   }
 
+  // mientras el guard decide / redirige
+  if (loading) return null;
+  if (!ok) return null;
+
+  // si no hay catalogUrl, el effect ya redirigió a /publicar/producto
+  if (!catalogUrl) return null;
+
   return (
     <div className="lp">
       {/* Header uniforme con landing */}
-<header className="lp__header">
-  <div className="lp__headerInner">
-    <button className="lp__brand" onClick={() => navigate("/")}>
-      <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
-      <span className="lp__brandText">Lokaly</span>
-    </button>
+      <header className="lp__header">
+        <div className="lp__headerInner">
+          <button className="lp__brand" onClick={() => navigate("/")}>
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+            <span className="lp__brandText">Lokaly</span>
+          </button>
 
-    <nav className="lp__nav">
-      <Link className="lp__navLink" to="/">
-        Home
-      </Link>
-      <a className="lp__navLink" href="/#how">
-        Cómo funciona
-      </a>
-      <a className="lp__navLink" href="/#contact">
-        Contacto
-      </a>
-      <button className="lp__navCta" onClick={() => navigate("/publicar")}>
-        Publicar
-      </button>
-    </nav>
-  </div>
-</header>
-
+          <nav className="lp__nav">
+            <Link className="lp__navLink" to="/">
+              Home
+            </Link>
+            <a className="lp__navLink" href="/#how">
+              Cómo funciona
+            </a>
+            <a className="lp__navLink" href="/#contact">
+              Contacto
+            </a>
+            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+              Publicar
+            </button>
+          </nav>
+        </div>
+      </header>
 
       <main className="lp__main">
         <section className="lp__detail" style={{ marginTop: 18 }}>
@@ -325,8 +343,10 @@ export function PublishSuccessPage() {
                   }}
                 >
                   <div style={{ fontWeight: 950, marginBottom: 6 }}>Ideas para vender más</div>
-                  • Publica 3–5 productos primero<br />
-                  • Usa fotos claras<br />
+                  • Publica 3–5 productos primero
+                  <br />
+                  • Usa fotos claras
+                  <br />
                   • Comparte tu link en grupos
                 </div>
               </div>
