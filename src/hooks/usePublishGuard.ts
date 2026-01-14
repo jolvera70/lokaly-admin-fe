@@ -1,18 +1,22 @@
 // src/hooks/usePublishGuard.ts
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePublishSession } from "./usePublishSession";
+import { usePublishSession, type PublishSession } from "./usePublishSession";
 
 export type PublishGuardOptions = {
   /** A dónde mandar si NO hay sesión válida */
   redirectTo?: string; // default "/publicar"
 };
 
-function isSessionValid(session: { phoneE164: string; phoneLocal: string; expireAt: string } | null) {
+function isSessionValid(session: PublishSession | null) {
   if (!session) return false;
   if (!session.phoneE164 || !session.phoneLocal) return false;
 
-  const t = new Date(session.expireAt).getTime();
+  // ✅ debe estar verificado
+  if (!session.verified) return false;
+
+  // ✅ expiresAt (del BE) debe ser futuro
+  const t = new Date(session.expiresAt).getTime();
   if (Number.isNaN(t)) return false;
 
   return Date.now() < t;
@@ -20,7 +24,6 @@ function isSessionValid(session: { phoneE164: string; phoneLocal: string; expire
 
 export function usePublishGuard(options: PublishGuardOptions = {}) {
   const navigate = useNavigate();
-
   const { redirectTo = "/publicar" } = options;
 
   const { loading, session } = usePublishSession();
@@ -30,18 +33,15 @@ export function usePublishGuard(options: PublishGuardOptions = {}) {
   useEffect(() => {
     if (loading) return;
 
-    // ❌ No hay cookie / sesión válida (o expirada)
     if (!ok) {
       navigate(redirectTo, { replace: true });
     }
-
-    // ✅ ok → no hace nada
   }, [loading, ok, navigate, redirectTo]);
 
   return {
     loading,
-    ok, // <- equivalente a "verifiedOk" en tu flujo actual
-    session, // phoneE164, phoneLocal, expireAt
+    ok, // ✅ este es el "verifiedOk" real
+    session,
     phoneE164: session?.phoneE164 ?? null,
     phoneLocal: session?.phoneLocal ?? null,
   };

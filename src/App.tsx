@@ -26,7 +26,7 @@ import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
 import SellerCheckoutPage from "./pages/SellerCheckoutPage";
 import { PublishStartPage } from "./pages/publicar/PublishStartPage";
-import { VerifyOtpPage } from "./pages/publicar/VerifyOtpPage";
+import VerifyOtpPage  from "./pages/publicar/VerifyOtpPage";
 import ProductFormPage from "./pages/publicar/ProductFormPage";
 import PaymentPage from "./pages/publicar/PaymentPage";
 import PublishSuccessPage  from "./pages/publicar/PublishSuccessPage";

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+// src/pages/publicar/VerifyOtpPage.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 import logoMark from "../../assets/brand/lokaly-mark.svg";
@@ -24,14 +25,16 @@ function maskPhoneE164(phoneE164: string) {
   return `+52 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)}${local.slice(8)}`;
 }
 
-export function VerifyOtpPage() {
+export default function VerifyOtpPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as LocationState;
 
+  // Preferir lo que venga del state; fallback a storage (UX)
   const [phoneE164, setPhoneE164] = useState<string | undefined>(state.phoneE164);
   const [phoneLocal, setPhoneLocal] = useState<string | undefined>(state.phoneLocal);
   const [otpSessionId, setOtpSessionId] = useState<string | undefined>(state.otpSessionId);
+
   const [cooldown, setCooldown] = useState<number>(state.cooldownSeconds ?? 60);
 
   const [code, setCode] = useState("");
@@ -74,7 +77,7 @@ export function VerifyOtpPage() {
           setOtpSessionId(resp.otpSessionId);
           setCooldown(resp.cooldownSeconds ?? 60);
 
-          // ✅ solo UX
+          // ✅ solo UX (NO seguridad)
           savePublishFlow({
             phoneE164: resp.phoneE164 ?? resolvedPhoneE164,
             phoneLocal: resolvedPhoneLocal,
@@ -115,10 +118,14 @@ export function VerifyOtpPage() {
 
     setLoading(true);
     try {
-      // ✅ Esto debe setear cookie lokaly_pub en el BE (Set-Cookie)
+      /**
+       * ✅ IMPORTANTE:
+       * verifyPublicOtp debe hacer fetch con credentials: "include"
+       * y el backend debe responder Set-Cookie: lokaly_pub=...
+       */
       await verifyPublicOtp(otpSessionId, codeDigits);
 
-      // ✅ solo UX (NO seguridad)
+      // ✅ Solo UX (NO seguridad)
       savePublishFlow({
         phoneE164,
         phoneLocal,
@@ -127,7 +134,7 @@ export function VerifyOtpPage() {
         verified: false,
       });
 
-      // ✅ ahora el acceso real lo hace usePublishGuard/usePublishSession en /publicar/producto
+      // ✅ La validación real la hará usePublishGuard en /publicar/producto
       navigate("/publicar/producto", { replace: true });
     } catch (e: any) {
       setError(e?.message || "OTP inválido o expirado");
@@ -181,10 +188,18 @@ export function VerifyOtpPage() {
           </button>
 
           <nav className="lp__nav">
-            <Link className="lp__navLink" to="/">Home</Link>
-            <a className="lp__navLink" href="/#how">Cómo funciona</a>
-            <a className="lp__navLink" href="/#contact">Contacto</a>
-            <button className="lp__navCta" onClick={() => navigate("/publicar")}>Publicar</button>
+            <Link className="lp__navLink" to="/">
+              Home
+            </Link>
+            <a className="lp__navLink" href="/#how">
+              Cómo funciona
+            </a>
+            <a className="lp__navLink" href="/#contact">
+              Contacto
+            </a>
+            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+              Publicar
+            </button>
           </nav>
         </div>
       </header>
@@ -199,7 +214,15 @@ export function VerifyOtpPage() {
             </div>
 
             <form onSubmit={onVerify} style={{ marginTop: 14 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 900, color: "rgba(15, 23, 42, 0.75)", marginBottom: 8 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  color: "rgba(15, 23, 42, 0.75)",
+                  marginBottom: 8,
+                }}
+              >
                 Código de verificación
               </label>
 
@@ -235,9 +258,7 @@ export function VerifyOtpPage() {
                   Ingresa el código de 6 dígitos.
                 </div>
               ) : (
-                <div style={{ marginTop: 8, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
-                  🔒 Código de 6 dígitos.
-                </div>
+                <div style={{ marginTop: 8, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>🔒 Código de 6 dígitos.</div>
               )}
 
               <button
@@ -299,6 +320,21 @@ export function VerifyOtpPage() {
                   1) Subir foto + precio
                   <br />
                   2) Pagar y publicar 30 días
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 14,
+                    border: "1px solid rgba(15,23,42,0.10)",
+                    background: "rgba(37,99,235,0.06)",
+                    color: "rgba(15,23,42,0.78)",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  Tip: Si no llega, revisa tu conexión de WhatsApp.
                 </div>
               </div>
             </div>
