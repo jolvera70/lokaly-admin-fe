@@ -6,12 +6,17 @@ import { PUBLIC_BASE_URL } from "../../api";
 /* =======================
    Types
 ======================= */
+export type CatalogImageDto = {
+  originalUrl: string;
+  mediumUrl: string;
+  thumbUrl: string;
+};
 
 type PublicProduct = {
   id: string;
   name: string;
   price: number;
-  imageUrls: string[];
+  images: CatalogImageDto[]; // ✅ antes: imageUrls
   shortDescription?: string;
   featured?: boolean;
   active?: boolean;
@@ -85,12 +90,10 @@ function safeNumber(v: any): number {
   if (v == null) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
   if (typeof v === "string") {
-    // soporta "99", "99.50", "$99", "99,000"
     const cleaned = v.replace(/[^\d.]/g, "");
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : 0;
   }
-  // BigDecimal-like
   if (typeof v === "object" && typeof v.toString === "function") {
     const s = String(v.toString());
     const cleaned = s.replace(/[^\d.]/g, "");
@@ -104,19 +107,49 @@ function isFalseyBoolean(v: any) {
   return v === false || v === "false" || v === 0 || v === "0";
 }
 
+// ✅ convierte CatalogImageDto[] -> string[] usando el tamaño deseado
+function imagesToUrls(
+  images: CatalogImageDto[] | undefined | null,
+  size: "thumb" | "medium" | "original"
+): string[] {
+  const list = Array.isArray(images) ? images : [];
+  return list
+    .map((img) => {
+      const raw =
+        size === "thumb"
+          ? img.thumbUrl
+          : size === "medium"
+          ? img.mediumUrl
+          : img.originalUrl;
+
+      return resolveImageUrl(raw);
+    })
+    .filter(Boolean) as string[];
+}
+
 /* =======================
    Image carousel with zoom
 ======================= */
 
-function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }) {
+function ProductImageCarousel({
+  images,
+  alt,
+}: {
+  images: CatalogImageDto[];
+  alt: string;
+}) {
   const [index, setIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
-  const safeImages = useMemo(() => (images || []).filter(Boolean), [images]);
-  if (!safeImages.length) return null;
+  // thumb para cards, original para modal
+  const thumbs = useMemo(() => imagesToUrls(images, "thumb"), [images]);
+  const originals = useMemo(() => imagesToUrls(images, "original"), [images]);
 
-  const total = safeImages.length;
-  const current = safeImages[index] ?? safeImages[0];
+  if (!thumbs.length) return null;
+
+  const total = thumbs.length;
+  const currentThumb = thumbs[index] ?? thumbs[0];
+  const currentOriginal = originals[index] ?? originals[0];
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -130,9 +163,10 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
 
   return (
     <>
+      {/* Card: thumb */}
       <div style={s.media} onClick={() => setIsOpen(true)}>
         <img
-          src={current}
+          src={currentThumb}
           alt={alt}
           loading="lazy"
           decoding="async"
@@ -155,7 +189,7 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
 
         {total > 1 && (
           <div style={s.dots}>
-            {safeImages.map((_, i) => (
+            {thumbs.map((_, i) => (
               <div
                 key={i}
                 style={{
@@ -169,10 +203,26 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
         )}
       </div>
 
+      {/* Modal: original (con fallback al thumb mientras carga) */}
       {isOpen && (
         <div onClick={() => setIsOpen(false)} style={s.modalBackdrop}>
           <div onClick={(e) => e.stopPropagation()} style={s.modalFrame}>
-            <img src={current} alt={alt} style={s.modalImg} />
+            {/* fondo: thumb */}
+            <img
+              src={currentThumb}
+              alt={alt}
+              style={{ ...s.modalImg, filter: "blur(8px)", transform: "scale(1.02)", opacity: 0.65 }}
+            />
+
+            {/* encima: original */}
+            <img
+              src={currentOriginal}
+              alt={alt}
+              style={{ ...s.modalImg, position: "absolute", inset: 0, filter: "none", opacity: 1 }}
+              loading="eager"
+              decoding="async"
+            />
+
             <button onClick={() => setIsOpen(false)} style={s.modalClose} aria-label="Cerrar">
               ✕
             </button>
@@ -193,7 +243,6 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
     </>
   );
 }
-
 /* =======================
    Sorting
 ======================= */
@@ -256,22 +305,24 @@ function normalizeProducts(raw: any): PublicProduct[] {
 
   return list
     .map((p: any) => {
-      const rawImages: string[] = Array.isArray(p?.imageUrls)
-        ? p.imageUrls
-        : Array.isArray(p?.images)
-        ? p.images
-        : [];
+      // ✅ NUEVO: soporta imageUrls como CatalogImageDto[] (objetos) o como string[]
+      let imgObjects: CatalogImageDto[] = [];
 
-      const single: string | undefined =
-        p?.imageUrl ?? p?.image ?? p?.thumbnail ?? undefined;
+      if (Array.isArray(p?.images)) {
+        imgObjects = p.images as CatalogImageDto[];
+      } else if (Array.isArray(p?.imageUrls)) {
+        const arr = p.imageUrls;
 
-      const resolvedImages = [
-        ...rawImages.map((u) => resolveImageUrl(u)).filter(Boolean),
-      ] as string[];
-
-      if (single) {
-        const s = resolveImageUrl(single);
-        if (s) resolvedImages.push(s);
+        // si el primer elemento es string => legacy string[]
+        if (typeof arr[0] === "string") {
+          imgObjects = arr
+            .map((u: any) => resolveImageUrl(String(u ?? "")))
+            .filter(Boolean)
+            .map((url: string) => ({ originalUrl: url!, mediumUrl: url!, thumbUrl: url! }));
+        } else {
+          // ✅ ya vienen objetos (como tu respuesta actual)
+          imgObjects = arr as CatalogImageDto[];
+        }
       }
 
       const active = p?.active;
@@ -289,7 +340,7 @@ function normalizeProducts(raw: any): PublicProduct[] {
         id: p?.id ?? p?._id ?? "",
         name: p?.title ?? p?.name ?? "Producto",
         price: safeNumber(p?.price),
-        imageUrls: resolvedImages,
+        images: imgObjects,
         shortDescription: p?.shortDescription ?? p?.description ?? undefined,
         featured: !!(p?.featured ?? p?.isFeatured),
         active: isVisible,
@@ -328,12 +379,8 @@ export function PublicCatalogPage() {
         headers: { Accept: "application/json" },
       });
 
-      if (res.status === 404) {
-        throw new Error("Catálogo no encontrado.");
-      }
-      if (!res.ok) {
-        throw new Error("No se pudo cargar el catálogo.");
-      }
+      if (res.status === 404) throw new Error("Catálogo no encontrado.");
+      if (!res.ok) throw new Error("No se pudo cargar el catálogo.");
 
       const raw = await res.json();
 
@@ -342,10 +389,7 @@ export function PublicCatalogPage() {
         products: normalizeProducts(raw),
       };
 
-      // si no hay productos visibles => mejor tratarlo como “no encontrado”
-      if (!normalized.products.length) {
-        throw new Error("Catálogo no encontrado.");
-      }
+      if (!normalized.products.length) throw new Error("Catálogo no encontrado.");
 
       setData(normalized);
     } catch (e: any) {
@@ -440,16 +484,7 @@ export function PublicCatalogPage() {
 
             <div style={s.headerRight}>
               <button onClick={copyCatalogLink} style={s.iconBtn} aria-label="Copiar link">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="gray"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg>
@@ -516,37 +551,42 @@ export function PublicCatalogPage() {
             </div>
           ) : (
             <section style={s.grid}>
-              {filteredProducts.map((p) => (
-                <article key={p.id} style={s.card}>
-                  <div style={{ position: "relative" }}>
-                    {p.imageUrls.length > 0 ? (
-                      <ProductImageCarousel images={p.imageUrls} alt={p.name} />
-                    ) : (
-                      <div style={s.noImg}>Sin imagen</div>
-                    )}
+              {filteredProducts.map((p) => {
+                // ✅ thumb para grid (rápido)
+                const cardImages = imagesToUrls(p.images, "thumb");
 
-                    {p.featured && <div style={s.badgeFeatured}>Destacado ✨</div>}
-                  </div>
+                return (
+                  <article key={p.id} style={s.card}>
+                    <div style={{ position: "relative" }}>
+                      {cardImages.length > 0 ? (
+                        <ProductImageCarousel images={p.images} alt={p.name} />
+                      ) : (
+                        <div style={s.noImg}>Sin imagen</div>
+                      )}
 
-                  <div style={s.cardBody}>
-                    <div style={s.cardTitle} title={p.name}>
-                      {p.name}
+                      {p.featured && <div style={s.badgeFeatured}>Destacado ✨</div>}
                     </div>
 
-                    <div style={s.cardPrice}>{moneyMXN(p.price)}</div>
+                    <div style={s.cardBody}>
+                      <div style={s.cardTitle} title={p.name}>
+                        {p.name}
+                      </div>
 
-                    <div style={s.statusRow}>
-                      <span style={s.statusAvailable}>Disponible</span>
-                    </div>
+                      <div style={s.cardPrice}>{moneyMXN(p.price)}</div>
 
-                    <div style={s.cardActions}>
-                      <button onClick={() => navigate(`/p/${p.id}`)} style={s.btnGhostWide}>
-                        Ver Detalles
-                      </button>
+                      <div style={s.statusRow}>
+                        <span style={s.statusAvailable}>Disponible</span>
+                      </div>
+
+                      <div style={s.cardActions}>
+                        <button onClick={() => navigate(`/p/${p.id}`)} style={s.btnGhostWide}>
+                          Ver Detalles
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </section>
           )}
         </main>

@@ -191,14 +191,13 @@ export function PublishStartPage() {
                   className="lp__input lp__input--phone"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="123 456 7890"
                   value={formatMxPhone(phone)}
                   onChange={(e) => setPhone(onlyDigits(e.target.value).slice(0, 10))}
                   onBlur={() => setTouched(true)}
                 />
               </div>
 
-              <div className="lp__hint">Ejemplo: 4771234567</div>
+              <div className="lp__hint">Ejemplo: 477 123 4567</div>
 
               {checkingSession ? (
                 <div className="lp__meta">Verificando sesión…</div>

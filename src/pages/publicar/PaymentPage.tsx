@@ -29,10 +29,6 @@ function formatMxMoney(n: number) {
   return `$${n}`;
 }
 
-function makeCatalogSlugFromPhone(phoneLocal: string) {
-  const last4 = phoneLocal.slice(-4);
-  return `mi-catalogo-${last4}`;
-}
 
 type Plan = {
   key: PlanKey;
@@ -273,15 +269,12 @@ export default function PaymentPage() {
       const published = await publishCatalogProduct(productId);
 
       // 4) navegar a listo
-      const slug = makeCatalogSlugFromPhone(draft.phoneLocal);
-      const link = `https://lokaly.site/catalog/${slug}`;
 
       navigate("/publicar/listo", {
         replace: true,
         state: {
           productId,
           orderId,
-          catalogUrl: link,
           plan: planKey,
           amountPaid: order.amount ?? priceToPay,
           currency: order.currency ?? "MXN",

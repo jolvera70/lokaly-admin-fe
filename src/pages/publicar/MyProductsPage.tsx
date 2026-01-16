@@ -13,14 +13,36 @@ import {
   getMyPublisherCatalog,
 } from "../../api";
 
+type CatalogImageDto = {
+  originalUrl: string;
+  mediumUrl: string;
+  thumbUrl: string;
+};
+
+function resolveImageUrl(rawUrl?: string | null): string {
+  if (!rawUrl) return "";
+  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+
+  const path = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+  if (path.startsWith("/api/")) return path;
+
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const origin = isLocal ? "https://lokaly.site" : window.location.origin;
+  return `${origin}${path}`;
+}
+
+function firstImageThumb(p: { imageUrls?: CatalogImageDto[] | null }) {
+  const img = p.imageUrls?.[0];
+  return resolveImageUrl(img?.thumbUrl || img?.mediumUrl || img?.originalUrl || "");
+}
+
 function moneyLabel(price: string) {
   if (!price) return "";
   return `$${price}`;
 }
 
 function firstImage(p: CatalogProductDto) {
-  const u = p.imageUrls?.[0];
-  return u || "";
+  return firstImageThumb(p as any);
 }
 
 type TabKey = "products" | "orders" | "stats";
@@ -33,6 +55,7 @@ function StatCard(props: { label: string; value: React.ReactNode; sub?: React.Re
         borderRadius: 16,
         border: "1px solid rgba(15,23,42,0.10)",
         background: "#fff",
+        boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
       }}
     >
       <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.55)" }}>{props.label}</div>
@@ -42,6 +65,33 @@ function StatCard(props: { label: string; value: React.ReactNode; sub?: React.Re
           {props.sub}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div
+      style={{
+        borderRadius: 18,
+        border: "1px solid rgba(15,23,42,0.08)",
+        background: "#fff",
+        padding: 12,
+        boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
+      }}
+    >
+      <div style={{ display: "grid", gridTemplateColumns: "92px 1fr", gap: 12 }}>
+        <div style={{ width: 92, height: 92, borderRadius: 14, background: "rgba(15,23,42,0.06)" }} />
+        <div>
+          <div style={{ height: 14, width: "62%", borderRadius: 999, background: "rgba(15,23,42,0.06)" }} />
+          <div style={{ marginTop: 10, height: 12, width: "85%", borderRadius: 999, background: "rgba(15,23,42,0.05)" }} />
+          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ height: 30, width: 110, borderRadius: 999, background: "rgba(15,23,42,0.06)" }} />
+            <div style={{ height: 30, width: 90, borderRadius: 999, background: "rgba(15,23,42,0.06)" }} />
+            <div style={{ height: 30, width: 100, borderRadius: 999, background: "rgba(15,23,42,0.06)" }} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -56,14 +106,11 @@ export default function MyProductsPage() {
   const [fetching, setFetching] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // créditos
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
   const [creditsLoading, setCreditsLoading] = useState<boolean>(true);
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Si luego quieres mostrar "Ver mi catálogo" aquí, lo conectamos con un endpoint /me (ya lo tienes en BE)
-  // por ahora dejamos el botón oculto para no inventar slug.
   const catalogSlug: string | null = null;
 
   const load = useCallback(async () => {
@@ -113,13 +160,11 @@ export default function MyProductsPage() {
     setBusyId(id);
     setErr(null);
 
-    // optimistic update
     setItems((prev) => prev.map((x) => (x.id === id ? ({ ...x, paused: nextPaused } as any) : x)));
 
     try {
       await setCatalogProductPaused(id, nextPaused);
-    } catch (e: any) {
-      // rollback
+    } catch {
       setItems((prev) => prev.map((x) => (x.id === id ? ({ ...x, paused: currentPaused } as any) : x)));
       setErr("No se pudo actualizar el estado. Intenta nuevamente.");
     } finally {
@@ -204,7 +249,6 @@ export default function MyProductsPage() {
             <div className="lp__detailTitle">Panel del catálogo</div>
             <div className="lp__detailText">Administra tus productos, revisa pedidos y mira tus estadísticas.</div>
 
-            {/* Banner créditos */}
             {creditsLeft !== null && (
               <div
                 style={{
@@ -218,35 +262,23 @@ export default function MyProductsPage() {
                   color: "rgba(15,23,42,0.72)",
                 }}
               >
-                {creditsLoading ? (
-                  <>Revisando créditos…</>
-                ) : hasCredits ? (
-                  <>✅ Tienes <b>{creditsLeft}</b> publicación(es) disponibles</>
-                ) : (
-                  <>ℹ️ No tienes publicaciones disponibles. Compra un paquete para publicar nuevos productos.</>
-                )}
+                {creditsLoading ? <>Revisando créditos…</> : hasCredits ? <>✅ Tienes <b>{creditsLeft}</b> publicación(es) disponibles</> : <>ℹ️ No tienes publicaciones disponibles. Compra un paquete para publicar nuevos productos.</>}
               </div>
             )}
 
-            {/* Tabs */}
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
               <TabButton k="products" label="Productos" emoji="📦" />
               <TabButton k="orders" label="Pedidos" emoji="🧾" />
               <TabButton k="stats" label="Estadísticas" emoji="📊" />
             </div>
 
-            {/* Acciones globales */}
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
               <button
                 type="button"
                 className="lp__btn lp__btn--primary"
                 onClick={() => navigate("/publicar/producto")}
                 disabled={creditsLoading}
-                style={{
-                  opacity: creditsLoading ? 0.7 : 1,
-                  cursor: creditsLoading ? "not-allowed" : "pointer",
-                }}
-                title={hasCredits ? "Publica un producto" : "Publica y paga / usa créditos"}
+                style={{ opacity: creditsLoading ? 0.7 : 1, cursor: creditsLoading ? "not-allowed" : "pointer" }}
               >
                 + Publicar producto
               </button>
@@ -255,19 +287,13 @@ export default function MyProductsPage() {
                 {fetching ? "Actualizando..." : "Actualizar"}
               </button>
 
-              {/* opcional: ver catálogo, solo si tienes slug */}
               {catalogSlug ? (
-                <button
-                  type="button"
-                  className="lp__btn lp__btn--ghost"
-                  onClick={() => window.open(`https://lokaly.site/catalog/${catalogSlug}`, "_blank")}
-                >
+                <button type="button" className="lp__btn lp__btn--ghost" onClick={() => window.open(`https://lokaly.site/catalog/${catalogSlug}`, "_blank")}>
                   🔗 Ver mi catálogo
                 </button>
               ) : null}
             </div>
 
-            {/* Error */}
             {err && (
               <div
                 style={{
@@ -286,13 +312,13 @@ export default function MyProductsPage() {
               </div>
             )}
 
-            {/* =========================
-                TAB: Productos
-               ========================= */}
             {tab === "products" ? (
               <div style={{ marginTop: 14 }}>
                 {fetching ? (
-                  <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.7 }}>Cargando productos…</div>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </div>
                 ) : !hasProducts ? (
                   <div
                     style={{
@@ -313,165 +339,192 @@ export default function MyProductsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {items.map((p) => {
-                      const paused = Boolean((p as any).paused);
-                      const img = firstImage(p);
-                      const busy = busyId === p.id;
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 12,
+                      gridTemplateColumns: "repeat(1, minmax(0, 1fr))",
+                    }}
+                  >
+                    {/* 2 columnas en pantallas grandes */}
+                    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                      {items.map((p) => {
+                        const paused = Boolean((p as any).paused);
+                        const img = firstImage(p);
+                        const busy = busyId === p.id;
 
-                      return (
-                        <div
-                          key={p.id}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "92px 1fr",
-                            gap: 12,
-                            padding: 12,
-                            borderRadius: 18,
-                            border: "1px solid rgba(15,23,42,0.10)",
-                            background: "#fff",
-                            opacity: busy ? 0.7 : 1,
-                          }}
-                        >
+                        return (
                           <div
+                            key={p.id}
                             style={{
-                              width: 92,
-                              height: 92,
-                              borderRadius: 14,
+                              borderRadius: 18,
+                              border: "1px solid rgba(15,23,42,0.10)",
+                              background: "#fff",
+                              boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
                               overflow: "hidden",
-                              background: "rgba(15,23,42,0.04)",
-                              border: "1px solid rgba(15,23,42,0.08)",
+                              opacity: busy ? 0.72 : 1,
+                              transition: "transform 140ms ease, box-shadow 140ms ease",
                             }}
                           >
-                            {img ? (
-                              <img
-                                src={img}
-                                alt={p.title}
-                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              />
-                            ) : null}
-                          </div>
+                            {/* imagen */}
+                            <div style={{ position: "relative" }}>
+                              <div style={{ height: 160, background: "rgba(15,23,42,0.04)" }}>
+                                {img ? (
+                                  <img
+                                    src={img}
+                                    alt={p.title}
+                                    loading="lazy"
+                                    decoding="async"
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                  />
+                                ) : null}
+                              </div>
 
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                              {/* badge precio */}
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: 10,
+                                  right: 10,
+                                  padding: "6px 10px",
+                                  borderRadius: 999,
+                                  background: "rgba(255,255,255,0.92)",
+                                  border: "1px solid rgba(15,23,42,0.10)",
+                                  fontWeight: 950,
+                                  fontSize: 13,
+                                  color: "rgba(15,23,42,0.88)",
+                                  backdropFilter: "blur(10px)",
+                                }}
+                              >
+                                {moneyLabel(p.price)}
+                              </div>
+
+                              {/* pill estado */}
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  left: 10,
+                                  top: 10,
+                                  padding: "6px 10px",
+                                  borderRadius: 999,
+                                  background: paused ? "rgba(245,158,11,0.16)" : "rgba(34,197,94,0.14)",
+                                  border: "1px solid rgba(15,23,42,0.10)",
+                                  fontWeight: 950,
+                                  fontSize: 12,
+                                  color: paused ? "rgba(161,98,7,0.95)" : "rgba(21,128,61,0.95)",
+                                }}
+                              >
+                                {paused ? "Pausado" : "Activo"}
+                              </div>
+                            </div>
+
+                            {/* contenido */}
+                            <div style={{ padding: 12 }}>
                               <div
                                 style={{
                                   fontWeight: 950,
                                   fontSize: 14,
-                                  color: "rgba(15,23,42,0.90)",
+                                  color: "rgba(15,23,42,0.92)",
+                                  whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
                                 }}
+                                title={p.title}
                               >
                                 {p.title}
                               </div>
 
-                              <div style={{ fontWeight: 950, fontSize: 14, color: "rgba(15,23,42,0.70)" }}>
-                                {moneyLabel(p.price)}
-                              </div>
-                            </div>
-
-                            {p.description ? (
-                              <div
-                                style={{
-                                  marginTop: 6,
-                                  fontSize: 12.5,
-                                  fontWeight: 750,
-                                  color: "rgba(15,23,42,0.62)",
-                                  lineHeight: 1.35,
-                                }}
-                              >
-                                {p.description}
-                              </div>
-                            ) : null}
-
-                            <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                              <button
-                                type="button"
-                                onClick={() => onTogglePaused(p)}
-                                disabled={busy}
-                                style={{
-                                  border: "1px solid rgba(15,23,42,0.14)",
-                                  background: paused ? "rgba(34,197,94,0.08)" : "rgba(245,158,11,0.10)",
-                                  borderRadius: 999,
-                                  padding: "8px 12px",
-                                  fontWeight: 950,
-                                  cursor: busy ? "not-allowed" : "pointer",
-                                }}
-                              >
-                                {paused ? "▶️ Reactivar" : "⏸️ Pausar"}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/publicar/editar/${p.id}`)}
-                                disabled={busy}
-                                style={{
-                                  border: "1px solid rgba(15,23,42,0.14)",
-                                  background: "rgba(15,23,42,0.03)",
-                                  borderRadius: 999,
-                                  padding: "8px 12px",
-                                  fontWeight: 950,
-                                  cursor: busy ? "not-allowed" : "pointer",
-                                }}
-                              >
-                                ✏️ Editar
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => onDelete(p)}
-                                disabled={busy}
-                                style={{
-                                  border: "1px solid rgba(220,38,38,0.22)",
-                                  background: "rgba(220,38,38,0.06)",
-                                  borderRadius: 999,
-                                  padding: "8px 12px",
-                                  fontWeight: 950,
-                                  cursor: busy ? "not-allowed" : "pointer",
-                                  color: "rgba(127,29,29,0.95)",
-                                }}
-                              >
-                                🗑️ Eliminar
-                              </button>
-
-                              {paused ? (
-                                <span
+                              {p.description ? (
+                                <div
                                   style={{
-                                    alignSelf: "center",
-                                    fontSize: 12,
-                                    fontWeight: 900,
-                                    color: "rgba(245,158,11,0.95)",
+                                    marginTop: 6,
+                                    fontSize: 12.5,
+                                    fontWeight: 750,
+                                    color: "rgba(15,23,42,0.62)",
+                                    lineHeight: 1.35,
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                    minHeight: 34,
                                   }}
+                                  title={p.description}
                                 >
-                                  Pausado
-                                </span>
+                                  {p.description}
+                                </div>
                               ) : (
-                                <span
+                                <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 750, color: "rgba(15,23,42,0.40)", minHeight: 34 }}>
+                                  Sin descripción
+                                </div>
+                              )}
+
+                              {/* acciones */}
+                              <div className="lp__actionsRow" style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => onTogglePaused(p)}
+                                  disabled={busy}
+                                  className="lp__chipBtn"
                                   style={{
-                                    alignSelf: "center",
-                                    fontSize: 12,
-                                    fontWeight: 900,
-                                    color: "rgba(34,197,94,0.95)",
+                                    background: paused ? "#0f172a" : "rgba(245,158,11,0.10)",
+                                    color: paused ? "#fff" : "rgba(15,23,42,0.85)",
+                                    border: paused ? "0" : "1px solid rgba(15,23,42,0.14)",
+                                    opacity: busy ? 0.7 : 1,
+                                    cursor: busy ? "not-allowed" : "pointer",
                                   }}
                                 >
-                                  Activo
-                                </span>
-                              )}
+                                  {paused ? "▶️ Reactivar" : "⏸️ Pausar"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/publicar/editar/${p.id}`)}
+                                  disabled={busy}
+                                  className="lp__chipBtn"
+                                  style={{
+                                    background: "rgba(15,23,42,0.03)",
+                                    opacity: busy ? 0.7 : 1,
+                                    cursor: busy ? "not-allowed" : "pointer",
+                                  }}
+                                >
+                                  ✏️ Editar
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => onDelete(p)}
+                                  disabled={busy}
+                                  className="lp__chipBtn"
+                                  style={{
+                                    background: "rgba(220,38,38,0.06)",
+                                    border: "1px solid rgba(220,38,38,0.22)",
+                                    color: "rgba(127,29,29,0.95)",
+                                    opacity: busy ? 0.7 : 1,
+                                    cursor: busy ? "not-allowed" : "pointer",
+                                  }}
+                                >
+                                  🗑️ Eliminar
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+
+                    {/* 1 columna en móvil */}
+                    <style>{`
+                      @media (max-width: 900px) {
+                        .lp__cardsGrid {
+                          grid-template-columns: 1fr !important;
+                        }
+                      }
+                    `}</style>
                   </div>
                 )}
               </div>
             ) : null}
 
-            {/* =========================
-                TAB: Pedidos (placeholder)
-               ========================= */}
             {tab === "orders" ? (
               <div style={{ marginTop: 14 }}>
                 <div
@@ -485,15 +538,7 @@ export default function MyProductsPage() {
                   }}
                 >
                   🧾 Aquí verás los pedidos creados desde tu catálogo.
-                  <div
-                    style={{
-                      marginTop: 8,
-                      fontSize: 12.5,
-                      fontWeight: 750,
-                      color: "rgba(15,23,42,0.62)",
-                      lineHeight: 1.45,
-                    }}
-                  >
+                  <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 750, color: "rgba(15,23,42,0.62)", lineHeight: 1.45 }}>
                     Próximo paso (backend):
                     <ul style={{ marginTop: 8 }}>
                       <li>GET pedidos del publisher (por cookie lokaly_pub)</li>
@@ -502,67 +547,20 @@ export default function MyProductsPage() {
                       <li>Mostrar WhatsApp del comprador + lista de productos</li>
                     </ul>
                   </div>
-
-                  <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="lp__btn lp__btn--ghost"
-                      onClick={() => alert("Conecta el endpoint /orders en el BE y lo enchufamos aquí.")}
-                    >
-                      + Conectar pedidos
-                    </button>
-                  </div>
                 </div>
               </div>
             ) : null}
 
-            {/* =========================
-                TAB: Estadísticas (placeholder + contadores básicos)
-               ========================= */}
             {tab === "stats" ? (
               <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
                   <StatCard label="Productos publicados" value={items.length} sub="Conteo actual (del listado)." />
-                  <StatCard
-                    label="Productos activos"
-                    value={activeCount}
-                    sub={pausedCount > 0 ? `${pausedCount} pausado(s)` : "Todos activos"}
-                  />
+                  <StatCard label="Productos activos" value={activeCount} sub={pausedCount > 0 ? `${pausedCount} pausado(s)` : "Todos activos"} />
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
                   <StatCard label="Créditos disponibles" value={creditsLeft ?? "—"} sub="Para publicar productos nuevos." />
-                  <StatCard label="Próxima métrica" value="—" sub="Vistas de catálogo, vistas por producto, pedidos." />
-                </div>
-
-                <div
-                  style={{
-                    padding: 14,
-                    borderRadius: 16,
-                    border: "1px solid rgba(15,23,42,0.10)",
-                    background: "rgba(15,23,42,0.02)",
-                    fontWeight: 850,
-                    color: "rgba(15,23,42,0.75)",
-                  }}
-                >
-                  📊 Próximo paso: métricas reales
-                  <div
-                    style={{
-                      marginTop: 8,
-                      fontSize: 12.5,
-                      fontWeight: 750,
-                      color: "rgba(15,23,42,0.62)",
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    Para mostrar:
-                    <ul style={{ marginTop: 8 }}>
-                      <li>Vistas del catálogo</li>
-                      <li>Vistas por producto</li>
-                      <li>Pedidos creados / conversión</li>
-                    </ul>
-                    Necesitamos registrar eventos (Mongo): <b>catalog_view</b>, <b>product_view</b>, <b>order_created</b>.
-                  </div>
+                  <StatCard label="Próxima métrica" value="—" sub="Vistas, conversión, pedidos." />
                 </div>
               </div>
             ) : null}

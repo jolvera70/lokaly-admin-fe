@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 import { usePublishGuard } from "../../hooks/usePublishGuard";
+import { getMyPublisherCatalog } from "../../api"; // ✅ ADD
 
 type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
 
@@ -13,15 +14,12 @@ type SuccessState = {
   plan?: PlanKey;
   title?: string;
 
-  // ✅ créditos (recomendado)
-  credits?: number; // comprados
-  creditsUsed?: number; // opcional: si el backend lo manda
-  creditsLeft?: number; // opcional: si el backend lo manda directo
+  credits?: number;
+  creditsUsed?: number;
+  creditsLeft?: number;
 
-  // opcional, visual
   imagesCount?: number;
 
-  // (opcional) NO usar como fuente de verdad para seguridad
   phoneE164?: string;
   phoneLocal?: string;
 };
@@ -51,50 +49,79 @@ function buildWhatsAppShareLink(catalogUrl: string) {
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
+// ✅ helper: considera inválido si no parece /catalog/<slug>
+function looksLikeCatalogUrl(url?: string) {
+  if (!url) return false;
+  return /\/catalog\/[^/]+$/i.test(url);
+}
+
 export default function PublishSuccessPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as SuccessState;
 
-  // ✅ Gate real: requiere cookie/sesión válida (el hook redirige si no hay)
   const { ok, phoneE164, phoneLocal, loading } = usePublishGuard({
     redirectTo: "/publicar",
   });
 
   const [copied, setCopied] = useState(false);
 
-  const catalogUrl = state.catalogUrl;
+  // ✅ ahora catalogUrl es “resuelto”, no solo state
+  const [catalogUrl, setCatalogUrl] = useState<string>(state.catalogUrl || "");
+  const [resolving, setResolving] = useState(false);
 
-  // ✅ Si pasas el gate pero entraste sin state (refresh/direct)
+  // ✅ Resolver catalogUrl real desde BE si falta o está mal
   useEffect(() => {
     if (loading) return;
     if (!ok) return;
-    if (!catalogUrl) {
-      navigate("/publicar/producto", { replace: true });
+
+    // si el state ya trae un link bueno, lo usamos
+    if (looksLikeCatalogUrl(state.catalogUrl)) {
+      setCatalogUrl(state.catalogUrl!);
+      return;
     }
-  }, [loading, ok, catalogUrl, navigate]);
+
+    let alive = true;
+
+    (async () => {
+      try {
+        setResolving(true);
+        const catalog = await getMyPublisherCatalog().catch(() => null);
+
+        const slug = (catalog as any)?.catalogSlug as string | undefined;
+        if (!slug) throw new Error("CATALOG_SLUG_MISSING");
+
+        const url = `https://lokaly.site/catalog/${slug}`;
+
+        if (!alive) return;
+        setCatalogUrl(url);
+      } catch {
+        // fallback: si no se pudo resolver, manda a panel (no a publicar)
+        if (!alive) return;
+        navigate("/publicar/mis-productos", { replace: true });
+      } finally {
+        if (alive) setResolving(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [loading, ok, state.catalogUrl, navigate]);
 
   const shareLink = useMemo(() => {
     if (!catalogUrl) return "";
     return buildWhatsAppShareLink(catalogUrl);
   }, [catalogUrl]);
 
-  // ✅ créditos: preferir backend; si no, fallback por plan
   const creditsPurchased = useMemo(() => {
     if (typeof state.credits === "number") return state.credits;
     return planCreditsFallback(state.plan);
   }, [state.credits, state.plan]);
 
   const creditsLeft = useMemo(() => {
-    // prioridad: backend directo
     if (typeof state.creditsLeft === "number") return Math.max(0, state.creditsLeft);
-
-    // si backend manda used
-    if (typeof state.creditsUsed === "number") {
-      return Math.max(0, creditsPurchased - state.creditsUsed);
-    }
-
-    // fallback: asumimos que ya consumió 1 por esta publicación
+    if (typeof state.creditsUsed === "number") return Math.max(0, creditsPurchased - state.creditsUsed);
     return Math.max(0, creditsPurchased - 1);
   }, [state.creditsLeft, state.creditsUsed, creditsPurchased]);
 
@@ -119,11 +146,8 @@ export default function PublishSuccessPage() {
   }
 
   function onPublishAnother() {
-    // ✅ usar datos “confiables” del guard (no location.state)
     if (phoneE164 && phoneLocal) {
-      navigate("/publicar/producto", {
-        state: { phoneE164, phoneLocal },
-      });
+      navigate("/publicar/producto", { state: { phoneE164, phoneLocal } });
       return;
     }
     navigate("/publicar");
@@ -131,7 +155,17 @@ export default function PublishSuccessPage() {
 
   if (loading) return null;
   if (!ok) return null;
-  if (!catalogUrl) return null;
+
+  // ✅ mientras resolvemos el link real (cuando state venía mal)
+  if (!catalogUrl || resolving) {
+    return (
+      <div className="lp">
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, fontWeight: 900 }}>
+          Preparando tu link…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lp">

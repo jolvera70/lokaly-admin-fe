@@ -10,6 +10,7 @@ import {
   getMyPublisherCatalog,     // ✅ NUEVO: lee créditos del catálogo del publisher (cookie lokaly_pub)
   publishProduct,            // ✅ NUEVO: publica un producto (usa créditos)
 } from "../../api";
+import { compressImageFile } from "../../utils/imageCompress";
 
 type DraftImage = {
   file: File;
@@ -130,50 +131,65 @@ export default function ProductFormPage() {
     fileInputRef.current?.click();
   }
 
-  function validateFile(file: File): string | null {
-    if (!isImageFile(file)) return "Selecciona imágenes JPG/PNG.";
-    if (file.size > MAX_IMAGE_MB * 1024 * 1024) return `La imagen es muy grande. Máximo ${MAX_IMAGE_MB}MB.`;
-    return null;
+function validateFile(file: File): string | null {
+  if (!isImageFile(file)) return "Selecciona imágenes JPG/PNG.";
+  // solo bloquea si es EXAGERADO (por ejemplo 50MB)
+  if (file.size > 50 * 1024 * 1024) return "La imagen es demasiado pesada (máx 50MB).";
+  return null;
+}
+
+async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+  setImgErr(null);
+
+  const fileList = e.target.files;
+  if (!fileList || fileList.length === 0) return;
+
+  const remaining = MAX_IMAGES - images.length;
+  if (remaining <= 0) {
+    setImgErr(`Máximo ${MAX_IMAGES} imágenes.`);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    return;
   }
 
-  function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setImgErr(null);
+  const picked = Array.from(fileList).slice(0, remaining);
 
-    const fileList = e.target.files;
-    if (!fileList || fileList.length === 0) return;
+  // ✅ comprimimos y luego agregamos
+  const next: DraftImage[] = [];
 
-    const remaining = MAX_IMAGES - images.length;
-    if (remaining <= 0) {
-      setImgErr(`Máximo ${MAX_IMAGES} imágenes.`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
+  for (const f of picked) {
+    const err = validateFile(f);
+    if (err) {
+      setImgErr(err);
+      continue;
     }
 
-    const picked = Array.from(fileList).slice(0, remaining);
+    try {
+      const c = await compressImageFile(f, {
+        maxSide: 1600,
+        quality: 0.82,
+        mimeType: "image/jpeg", // o "image/jpeg"
+      });
 
-    const next: DraftImage[] = [];
-    for (const f of picked) {
-      const err = validateFile(f);
-      if (err) {
-        setImgErr(err);
-        continue;
-      }
+      next.push({ file: c.file, previewUrl: c.previewUrl });
+    } catch {
+      // fallback: si algo falla, usamos el original
       next.push({ file: f, previewUrl: URL.createObjectURL(f) });
     }
-
-    if (next.length === 0) {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    setImages((prev) => {
-      const merged = [...prev, ...next];
-      if (merged.length > 0 && prev.length === 0) setActiveIndex(0);
-      return merged;
-    });
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
+
+  if (next.length === 0) {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    return;
+  }
+
+  setImages((prev) => {
+    const merged = [...prev, ...next];
+    if (merged.length > 0 && prev.length === 0) setActiveIndex(0);
+    return merged;
+  });
+
+  if (fileInputRef.current) fileInputRef.current.value = "";
+}
 
   function removeImageAt(idx: number) {
     setImages((prev) => {

@@ -546,10 +546,6 @@ export async function createPublishProductDraft(params: {
   fd.append("primaryIndex", String(params.primaryIndex ?? 0));
   params.images.forEach((file) => fd.append("images", file));
 
-  // 🔎 logs (temporal)
-  console.log("[DRAFT] url", publicUrl(`/v1/catalog/products/draft`));
-  console.log("[DRAFT] entries", [...fd.entries()].map(([k, v]) => [k, v instanceof File ? `${v.name} (${v.type})` : v]));
-
   const res = await publicFetch(publicUrl(`/v1/catalog/products/draft`), {
     method: "POST",
     credentials: "include",
@@ -664,12 +660,18 @@ export async function publishCatalogProduct(productId: string) {
 
 // ===== PUBLIC: Catalog Products (manage) =====
 
+export type CatalogImageDto = {
+  originalUrl: string;
+  mediumUrl: string;
+  thumbUrl: string;
+};
+
 export type CatalogProductDto = {
   id: string;
   title: string;
   price: string;
   description?: string | null;
-  imageUrls?: string[];
+  imageUrls?: CatalogImageDto[];
   active?: boolean;     // o paused (depende tu modelo)
   paused?: boolean;     // si tu response lo trae
   deleted?: boolean;
@@ -701,12 +703,21 @@ export async function setCatalogProductPaused(productId: string, paused: boolean
     body: JSON.stringify({ paused }),
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const err = new Error(text || "No se pudo actualizar el estado del producto");
-    (err as any).status = res.status;
-    throw err;
-  }
+if (!res.ok) {
+  const contentType = res.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await res.json().catch(() => null)
+    : await res.text().catch(() => "");
+
+  const err = new Error(
+    typeof payload === "string"
+      ? payload || "No se pudo actualizar el estado del producto"
+      : payload?.message || "No se pudo actualizar el estado del producto"
+  );
+  (err as any).status = res.status;
+  (err as any).payload = payload;
+  throw err;
+}
 }
 
 export async function deleteCatalogProduct(productId: string) {

@@ -13,6 +13,23 @@
   overflow-x: hidden;
 }
 
+/* Placeholder consistente (cross-browser) */
+.lp__input::placeholder,
+.lp__input::-webkit-input-placeholder,
+.lp__input::-moz-placeholder,
+.lp__input:-ms-input-placeholder {
+  color: rgba(221, 226, 237, 0.38);
+}
+
+.lp__input {
+  background: #fff;
+  color: #81858e;
+}
+
+.lp__input::placeholder {
+  opacity: 1; /* Firefox a veces baja opacity por defecto */
+}
+
 /* =========================
    Header
 ========================= */
@@ -568,7 +585,7 @@
   flex: 1;
   height: 46px;
   border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(88, 96, 115, 0.12);
   padding: 0 12px;
   outline: none;
   font-size: 14px;
@@ -600,4 +617,55 @@
 .lp__btn--block {
   width: 100%;
   margin-top: 14px;
+}
+
+/* ✅ En tarjetas de producto, los botones NO deben ser full width */
+.lp__actionsRow button {
+  width: auto !important;
+  max-width: none !important;
+}
+
+/* Botón chip (compacto) */
+.lp__chipBtn {
+  width: auto !important;
+  max-width: none !important;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 950;
+  cursor: pointer;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255,255,255,0.96);
+}
+
+/* Variantes */
+.lp__chipBtn--primary {
+  background: #0f172a;
+  color: #fff;
+  border: 0;
+}
+.lp__chipBtn--warn {
+  background: rgba(245,158,11,0.10);
+}
+.lp__chipBtn--danger {
+  background: rgba(220,38,38,0.06);
+  border-color: rgba(220,38,38,0.22);
+  color: rgba(127,29,29,0.95);
+}
+
+/* ✅ Cards: evita que tu regla global fuerce width:100% en acciones */
+.lp__actionsRow button {
+  width: auto !important;
+  max-width: none !important;
+}
+
+/* Chip button base */
+.lp__chipBtn {
+  width: auto !important;
+  max-width: none !important;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 950;
+  cursor: pointer;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.96);
 }

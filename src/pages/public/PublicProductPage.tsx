@@ -7,12 +7,18 @@ import { PUBLIC_BASE_URL } from "../../api";
    Types
 ======================= */
 
+type CatalogImageDto = {
+  originalUrl: string;
+  mediumUrl: string;
+  thumbUrl: string;
+};
+
 type PublicProductDetail = {
   id: string;
   name: string;
   price: number;
   description?: string;
-  imageUrls: string[];
+  images: CatalogImageDto[]; // ✅ BE nuevo: images como objetos
   featured?: boolean;
 
   // ✅ sin cobro, solo disponibilidad
@@ -55,10 +61,30 @@ export function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (path.startsWith("/api/")) return path;
 
   // otros paths (ej. /uploads/.., /media/..) => en local prefijamos al server real
-  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const isLocal =
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
   const origin = isLocal ? "https://lokaly.site" : window.location.origin;
 
   return `${origin}${path}`;
+}
+
+function imagesToUrls(
+  images: CatalogImageDto[] | undefined | null,
+  size: "thumb" | "medium" | "original"
+): string[] {
+  const list = Array.isArray(images) ? images : [];
+  return list
+    .map((img) => {
+      const raw =
+        size === "thumb"
+          ? img.thumbUrl
+          : size === "medium"
+          ? img.mediumUrl
+          : img.originalUrl;
+
+      return resolveImageUrl(raw);
+    })
+    .filter(Boolean) as string[];
 }
 
 function cleanPhone(phone: string) {
@@ -513,21 +539,38 @@ export function PublicProductPage() {
 
       const raw = await res.json();
 
-      const rawImages: string[] = Array.isArray(raw.imageUrls)
-        ? raw.imageUrls
-        : Array.isArray(raw.images)
-        ? raw.images
-        : [];
+const pick = (x: any): CatalogImageDto[] => {
+  if (!Array.isArray(x)) return [];
 
+  // objects [{thumbUrl, mediumUrl, originalUrl}]
+  if (x.length === 0) return [];
+  if (typeof x[0] === "object" && x[0] !== null) {
+    return x as CatalogImageDto[];
+  }
+
+  // legacy strings ["/api/.../t.jpg", ...]
+  if (typeof x[0] === "string") {
+    return (x as string[])
+      .map((u) => {
+        const url = resolveImageUrl(u);
+        if (!url) return null;
+        return { thumbUrl: url, mediumUrl: url, originalUrl: url };
+      })
+      .filter(Boolean) as CatalogImageDto[];
+  }
+
+  return [];
+};
+
+const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
+  ? pick(raw.imageUrls)
+  : pick(raw.images);
+
+      // compat legacy single
       const single = (raw.imageUrl as string | undefined) || (raw.image as string | undefined);
-
-      const resolvedImages: string[] = rawImages
-        .map((u) => resolveImageUrl(u))
-        .filter(Boolean) as string[];
-
       if (single) {
-        const sImg = resolveImageUrl(single);
-        if (sImg) resolvedImages.push(sImg);
+        const url = resolveImageUrl(single);
+        if (url) imgObjects.unshift({ originalUrl: url, mediumUrl: url, thumbUrl: url });
       }
 
       const normalized: PublicProductDetail = {
@@ -535,7 +578,7 @@ export function PublicProductPage() {
         name: raw.title ?? raw.name,
         price: Number(raw.price ?? 0),
         description: raw.description ?? raw.shortDescription ?? raw.longDescription,
-        imageUrls: resolvedImages,
+        images: imgObjects,
         featured: !!raw.featured,
         availableQuantity: raw.availableQuantity ?? null,
         seller: {
@@ -670,8 +713,10 @@ export function PublicProductPage() {
     );
   }
 
-  const stockLabel =
-    available == null ? "Disponible" : available === 0 ? "Agotado" : `Quedan ${available}`;
+  const stockLabel = available == null ? "Disponible" : available === 0 ? "Agotado" : `Quedan ${available}`;
+
+  // ✅ URL list para el carousel
+  const gallery = imagesToUrls(data.images, "medium");
 
   return (
     <div style={s.page}>
@@ -699,7 +744,8 @@ export function PublicProductPage() {
             <div style={s.brandSub}>
               {data.seller.clusterName ? (
                 <>
-                  {data.seller.clusterName} <span style={{ opacity: 0.55 }}>· {data.seller.name}</span>
+                  {data.seller.clusterName}{" "}
+                  <span style={{ opacity: 0.55 }}>· {data.seller.name}</span>
                 </>
               ) : (
                 <span style={{ opacity: 0.75 }}>{data.seller.name}</span>
@@ -715,21 +761,21 @@ export function PublicProductPage() {
                 aria-label="Ver catálogo"
                 title="Ver catálogo"
               >
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#111827"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ display: "block" }}
-  >
-    <path d="M3 9l1-5h16l1 5" />
-    <path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
-    <path d="M9 21V12h6v9" />
-  </svg>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#111827"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ display: "block" }}
+                >
+                  <path d="M3 9l1-5h16l1 5" />
+                  <path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
+                  <path d="M9 21V12h6v9" />
+                </svg>
               </button>
             ) : null}
 
@@ -754,8 +800,8 @@ export function PublicProductPage() {
 
         {/* Product card */}
         <section style={s.card}>
-          {data.imageUrls.length > 0 ? (
-            <ProductImageCarousel images={data.imageUrls} alt={data.name} isMobile={isMobile} />
+          {gallery.length > 0 ? (
+            <ProductImageCarousel images={gallery} alt={data.name} isMobile={isMobile} />
           ) : (
             <div style={{ ...s.noImg, height: isMobile ? 280 : 360 }}>Sin imagen</div>
           )}
@@ -769,32 +815,42 @@ export function PublicProductPage() {
 
             <div style={{ ...s.price, fontSize: isMobile ? 16 : 18 }}>{moneyMXN(data.price)}</div>
 
-            {data.description ? <p style={s.desc}>{data.description}</p> : <p style={s.descMuted}>Este producto no tiene descripción.</p>}
+            {data.description ? (
+              <p style={s.desc}>{data.description}</p>
+            ) : (
+              <p style={s.descMuted}>Este producto no tiene descripción.</p>
+            )}
 
-      {/* Sticky CTA */}
-      <div style={s.sellerCTA}>
-        <button onClick={copyLink} style={s.bottomGhost}>
-          Copiar link
-        </button>
+            {/* Sticky CTA */}
+            <div style={s.sellerCTA}>
+              <button onClick={copyLink} style={s.bottomGhost}>
+                Copiar link
+              </button>
 
-        <button onClick={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)} style={s.bottomWhats}>
-          WhatsApp
-        </button>
+              <button
+                onClick={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)}
+                style={s.bottomWhats}
+              >
+                WhatsApp
+              </button>
 
-        <button
-          onClick={openOrderModal}
-          style={{ ...s.bottomBlack, ...(isOutOfStock ? s.bottomDisabled : null) }}
-          disabled={isOutOfStock}
-          title={isOutOfStock ? "Producto agotado" : "Enviar solicitud al vendedor"}
-        >
-          {isOutOfStock ? "Agotado" : "Comprar"}
-        </button>
-      </div>   
+              <button
+                onClick={openOrderModal}
+                style={{ ...s.bottomBlack, ...(isOutOfStock ? s.bottomDisabled : null) }}
+                disabled={isOutOfStock}
+                title={isOutOfStock ? "Producto agotado" : "Enviar solicitud al vendedor"}
+              >
+                {isOutOfStock ? "Agotado" : "Comprar"}
+              </button>
+            </div>
+
             {/* Seller strip */}
             <div style={s.sellerStrip}>
               <div style={{ minWidth: 0 }}>
                 <div style={s.sellerName}>{data.seller.name}</div>
-                <div style={s.sellerZone}>{data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}</div>
+                <div style={s.sellerZone}>
+                  {data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}
+                </div>
               </div>
 
               <button
@@ -805,7 +861,7 @@ export function PublicProductPage() {
               >
                 Ver catálogo del vendedor
               </button>
-            </div>               
+            </div>
           </div>
         </section>
       </div>
@@ -897,7 +953,14 @@ const s: Record<string, React.CSSProperties> = {
   cardBody: { padding: 14 },
 
   titleRow: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 },
-  title: { margin: 0, fontSize: 20, fontWeight: 1000, lineHeight: 1.15, flex: "1 1 220px", minWidth: 0 },
+  title: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 1000,
+    lineHeight: 1.15,
+    flex: "1 1 220px",
+    minWidth: 0,
+  },
   price: { fontSize: 18, fontWeight: 1000, marginBottom: 10 },
 
   pillFeatured: {
@@ -931,6 +994,7 @@ const s: Record<string, React.CSSProperties> = {
 
   desc: { margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.55 },
   descMuted: { margin: 0, fontSize: 14, color: "#9CA3AF", lineHeight: 1.55 },
+
   sellerCTA: {
     marginTop: 14,
     padding: 12,
@@ -1053,8 +1117,19 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     padding: 16,
   },
-  modalFrame: { position: "relative", maxWidth: "min(980px, 100%)", maxHeight: "90vh", width: "100%" },
-  modalImg: { width: "100%", maxHeight: "90vh", objectFit: "contain", borderRadius: 18, backgroundColor: "#000" },
+  modalFrame: {
+    position: "relative",
+    maxWidth: "min(980px, 100%)",
+    maxHeight: "90vh",
+    width: "100%",
+  },
+  modalImg: {
+    width: "100%",
+    maxHeight: "90vh",
+    objectFit: "contain",
+    borderRadius: 18,
+    backgroundColor: "#000",
+  },
   modalClose: {
     position: "absolute",
     top: 10,
@@ -1156,7 +1231,13 @@ const s: Record<string, React.CSSProperties> = {
   errorText: { marginTop: 6, color: "#6B7280" },
 
   skeletonTop: { height: 380, borderRadius: 18, background: "#ECECEC", border: "1px solid #E5E7EB" },
-  skeletonBody: { marginTop: 12, height: 280, borderRadius: 18, background: "#ECECEC", border: "1px solid #E5E7EB" },
+  skeletonBody: {
+    marginTop: 12,
+    height: 280,
+    borderRadius: 18,
+    background: "#ECECEC",
+    border: "1px solid #E5E7EB",
+  },
 
   toast: {
     position: "fixed",
@@ -1277,7 +1358,12 @@ const s: Record<string, React.CSSProperties> = {
   },
   helperPro: { fontSize: 12, color: "#6B7280" },
 
-  qtyRowPro: { display: "grid", gridTemplateColumns: "44px 1fr 44px", gap: 10, alignItems: "center" },
+  qtyRowPro: {
+    display: "grid",
+    gridTemplateColumns: "44px 1fr 44px",
+    gap: 10,
+    alignItems: "center",
+  },
   qtyBtnPro: {
     width: 44,
     height: 44,

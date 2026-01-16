@@ -31,6 +31,7 @@ import ProductFormPage from "./pages/publicar/ProductFormPage";
 import PaymentPage from "./pages/publicar/PaymentPage";
 import PublishSuccessPage  from "./pages/publicar/PublishSuccessPage";
 import MyProductsPage from "./pages/publicar/MyProductsPage";
+import EditProductPage from "./pages/publicar/EditProductPage";
 
 
 // Públicas
@@ -156,6 +157,7 @@ function App() {
         <Route path="/publicar/pago" element={<PaymentPage />} />
         <Route path="/publicar/listo" element={<PublishSuccessPage />} />
         <Route path="/publicar/mis-productos" element={<MyProductsPage />} />
+        <Route path="/publicar/editar/:productId" element={<EditProductPage />} />
 
         {/* 🔑 Login */}
         <Route
