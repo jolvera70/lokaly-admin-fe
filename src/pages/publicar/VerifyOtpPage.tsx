@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import "../LandingPage.css";
+import logoMark from "../../assets/brand/lokaly-mark.svg";
 
 type Props = {
-  phoneE164: string; // "+52 123 456 7117"
+  phoneE164: string;
   onVerify: (code: string) => Promise<void>;
   onResend: () => Promise<void>;
   onChangeNumber: () => void;
+  initialCooldownSeconds?: number;
 };
 
 export function VerifyOtpPage({
@@ -12,14 +16,15 @@ export function VerifyOtpPage({
   onVerify,
   onResend,
   onChangeNumber,
+  initialCooldownSeconds = 50,
 }: Props) {
+  const navigate = useNavigate();
+
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [resendIn, setResendIn] = useState(initialCooldownSeconds);
 
-  const [resendIn, setResendIn] = useState(50); // segundos
-
-  // ✅ Tipado recomendado
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const code = useMemo(() => digits.join(""), [digits]);
@@ -31,11 +36,13 @@ export function VerifyOtpPage({
     return () => clearInterval(t);
   }, [resendIn]);
 
+  useEffect(() => {
+  setResendIn(initialCooldownSeconds);
+}, [initialCooldownSeconds]);
+
   const maskPhone = (p: string) => {
     const last4 = p.replace(/\D/g, "").slice(-4);
-    return p.startsWith("+")
-      ? p.replace(/\d(?=\d{4})/g, "•")
-      : `•••• ${last4}`;
+    return `•••• •••• ${last4}`;
   };
 
   const focusIndex = (i: number) => inputsRef.current[i]?.focus();
@@ -52,12 +59,12 @@ export function VerifyOtpPage({
     setErrorMsg(null);
 
     const onlyNums = raw.replace(/\D/g, "");
+    // paste 6 digits
     if (onlyNums.length > 1) {
       const next = Array(6).fill("");
       for (let k = 0; k < 6; k++) next[k] = onlyNums[k] ?? "";
       setDigits(next);
-      const last = Math.min(5, onlyNums.length - 1);
-      focusIndex(last);
+      focusIndex(Math.min(5, onlyNums.length - 1));
       return;
     }
 
@@ -69,7 +76,6 @@ export function VerifyOtpPage({
   const handleKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace") {
       setErrorMsg(null);
-
       if (digits[i]) {
         setDigitAt(i, "");
       } else if (i > 0) {
@@ -77,7 +83,6 @@ export function VerifyOtpPage({
         focusIndex(i - 1);
       }
     }
-
     if (e.key === "ArrowLeft" && i > 0) focusIndex(i - 1);
     if (e.key === "ArrowRight" && i < 5) focusIndex(i + 1);
   };
@@ -91,24 +96,23 @@ export function VerifyOtpPage({
       await onVerify(code);
     } catch (err: any) {
       const status = err?.status ?? err?.response?.status;
-      const msg =
+      setErrorMsg(
         status === 400
           ? "El código es incorrecto o ya expiró. Intenta nuevamente."
-          : "No pudimos verificar el código. Intenta otra vez.";
-      setErrorMsg(msg);
+          : "No pudimos verificar el código. Intenta otra vez."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const resend = async () => {
-    if (resendIn > 0) return;
+    if (resendIn > 0 || loading) return;
     setLoading(true);
     setErrorMsg(null);
 
     try {
       await onResend();
-      setResendIn(50);
       setDigits(Array(6).fill(""));
       focusIndex(0);
     } catch {
@@ -119,205 +123,178 @@ export function VerifyOtpPage({
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.shell}>
-        <div style={styles.brandRow}>
-          <div style={styles.brandDot} />
-          <div>
-            <div style={styles.brandName}>Lokaly</div>
-            <div style={styles.brandTag}>Confirmación</div>
-          </div>
-        </div>
-
-        <div style={styles.card}>
-          <div style={styles.title}>Ingresa el código</div>
-          <div style={styles.subtitle}>
-            Enviamos un código a <b>{maskPhone(phoneE164)}</b>
-          </div>
-
-          {errorMsg && (
-            <div style={styles.errorBox} role="alert" aria-live="polite">
-              <span style={{ fontWeight: 700 }}>❌</span>
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          <div style={styles.otpRow} aria-label="Código de verificación">
-            {digits.map((d, i) => (
-              <input
-                key={i}
-                // ✅ FIX: callback ref NO debe retornar nada
-                ref={(el) => {
-                  inputsRef.current[i] = el;
-                }}
-                value={d}
-                inputMode="numeric"
-                autoComplete={i === 0 ? "one-time-code" : "off"}
-                aria-label={`Dígito ${i + 1}`}
-                onChange={(e) => handleChange(i, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(i, e)}
-                style={{
-                  ...styles.otpBox,
-                  borderColor: errorMsg ? "#fca5a5" : "#e5e7eb",
-                  boxShadow: d ? "0 0 0 4px rgba(59,130,246,0.12)" : "none",
-                }}
-              />
-            ))}
-          </div>
-
-          <button
-            onClick={submit}
-            disabled={!canVerify}
-            style={{
-              ...styles.primaryBtn,
-              opacity: canVerify ? 1 : 0.55,
-              cursor: canVerify ? "pointer" : "not-allowed",
-            }}
-          >
-            {loading ? "Verificando…" : "Verificar"}
+    <div className="lp">
+      {/* Header consistente */}
+      <header className="lp__header">
+        <div className="lp__headerInner">
+          <button className="lp__brand" onClick={() => navigate("/")}>
+            <img className="lp__logoImg" src={logoMark} alt="Lokaly" />
+            <span className="lp__brandText">Lokaly</span>
           </button>
 
-          <div style={styles.actionsRow}>
-            <button
-              onClick={resend}
-              disabled={resendIn > 0 || loading}
-              style={styles.linkBtn}
-            >
-              {resendIn > 0 ? `Reenviar en ${resendIn}s` : "Reenviar código"}
+          <nav className="lp__nav">
+            <Link className="lp__navLink" to="/ejemplo">
+              Ver ejemplo
+            </Link>
+            <a className="lp__navLink" href="/#faq">
+              Preguntas
+            </a>
+            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+              Publicar
             </button>
+          </nav>
+        </div>
+      </header>
 
-            <span style={styles.dotSep}>•</span>
+      <main className="lp__main">
+        <section className="lp__detail" style={{ marginTop: 18 }}>
+          <div className="lp__detailLeft">
+            <div className="lp__detailKicker">Publica tu producto</div>
+            <div className="lp__detailTitle">Ingresa el código</div>
+            <div className="lp__detailText">
+              Enviamos un código a <b>{maskPhone(phoneE164)}</b>
+            </div>
 
-            <button
-              onClick={onChangeNumber}
-              disabled={loading}
-              style={styles.linkBtn}
-            >
-              Cambiar número
-            </button>
+            {errorMsg && (
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: "rgba(220,38,38,0.06)",
+                  border: "1px solid rgba(220,38,38,0.18)",
+                  color: "rgba(127,29,29,0.95)",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                }}
+                role="alert"
+              >
+                <span aria-hidden>⚠️</span>
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <div style={{ marginTop: 14 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(6, 1fr)",
+                  gap: 10,
+                }}
+                aria-label="Código de verificación"
+              >
+                {digits.map((d, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => {
+                      inputsRef.current[i] = el;
+                    }}
+                    value={d}
+                    inputMode="numeric"
+                    autoComplete={i === 0 ? "one-time-code" : "off"}
+                    aria-label={`Dígito ${i + 1}`}
+                    onChange={(e) => handleChange(i, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(i, e)}
+                    style={{
+                      height: 52,
+                      borderRadius: 14,
+                      border: errorMsg
+                        ? "1px solid rgba(220,38,38,0.35)"
+                        : "1px solid rgba(15,23,42,0.14)",
+                      background: "#fff",
+                      color: "#0f172a",
+                      fontSize: 20,
+                      fontWeight: 900,
+                      textAlign: "center",
+                      outline: "none",
+                      boxShadow: d ? "0 0 0 4px rgba(37,99,235,0.10)" : "none",
+                    }}
+                  />
+                ))}
+              </div>
+
+              <button
+                className="lp__btn lp__btn--primary"
+                onClick={submit}
+                disabled={!canVerify}
+                style={{
+                  marginTop: 14,
+                  width: "100%",
+                  opacity: canVerify ? 1 : 0.7,
+                  cursor: canVerify ? "pointer" : "not-allowed",
+                }}
+              >
+                {loading ? "Verificando..." : "Verificar"}
+              </button>
+
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: 12,
+                  fontSize: 12.5,
+                  color: "rgba(15,23,42,0.65)",
+                  fontWeight: 800,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={resend}
+                  disabled={resendIn > 0 || loading}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "rgba(37,99,235,0.95)",
+                    fontWeight: 900,
+                    cursor: resendIn > 0 || loading ? "not-allowed" : "pointer",
+                    padding: 6,
+                  }}
+                >
+                  {resendIn > 0 ? `Reenviar en ${resendIn}s` : "Reenviar código"}
+                </button>
+
+                <span style={{ opacity: 0.5 }}>•</span>
+
+                <button
+                  type="button"
+                  onClick={onChangeNumber}
+                  disabled={loading}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "rgba(15,23,42,0.8)",
+                    fontWeight: 900,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    padding: 6,
+                  }}
+                >
+                  Cambiar número
+                </button>
+              </div>
+
+              <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
+                🔒 Seguro y rápido · No compartimos tu código
+              </div>
+            </div>
           </div>
 
-          <div style={styles.tip}>
-            Tip: Si no llega, revisa tu conexión de WhatsApp o intenta reenviar.
+          <div className="lp__detailRight">
+            <div className="lp__detailImgWrap">
+              <div style={{ width: "100%" }}>
+                <div style={{ fontWeight: 950, marginBottom: 6 }}>Tip</div>
+                <div style={{ fontSize: 13, color: "rgba(15,23,42,0.68)", lineHeight: 1.45 }}>
+                  Si no llega, revisa tu conexión de WhatsApp o intenta reenviar.
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div style={styles.footer}>
-          <span style={styles.footerText}>Seguro y rápido • No compartimos tu código</span>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "grid",
-    placeItems: "center",
-    background:
-      "radial-gradient(1200px 600px at 50% -10%, rgba(59,130,246,0.18), transparent 60%), linear-gradient(#0b1220, #070b12)",
-    padding: 18,
-  },
-  shell: { width: "100%", maxWidth: 420 },
-  brandRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
-    paddingLeft: 6,
-  },
-  brandDot: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
-    boxShadow: "0 10px 30px rgba(245,158,11,0.25)",
-  },
-  brandName: { color: "white", fontWeight: 800, fontSize: 18, lineHeight: 1.1 },
-  brandTag: { color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 },
-  card: {
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 18,
-    padding: 18,
-    boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
-    backdropFilter: "blur(10px)",
-  },
-  title: { color: "white", fontSize: 22, fontWeight: 900, letterSpacing: -0.3 },
-  subtitle: {
-    color: "rgba(255,255,255,0.72)",
-    fontSize: 14,
-    marginTop: 6,
-    marginBottom: 14,
-    lineHeight: 1.45,
-  },
-  errorBox: {
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    padding: "10px 12px",
-    borderRadius: 12,
-    background: "rgba(239,68,68,0.14)",
-    border: "1px solid rgba(239,68,68,0.35)",
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  otpRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(6, 1fr)",
-    gap: 10,
-    marginBottom: 14,
-  },
-  otpBox: {
-    height: 52,
-    borderRadius: 14,
-    border: "1px solid #e5e7eb",
-    background: "rgba(255,255,255,0.92)",
-    color: "#0b1220",
-    fontSize: 20,
-    fontWeight: 800,
-    textAlign: "center",
-    outline: "none",
-  },
-  primaryBtn: {
-    width: "100%",
-    height: 48,
-    borderRadius: 14,
-    border: "none",
-    fontWeight: 800,
-    fontSize: 16,
-    color: "#0b1220",
-    background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
-    boxShadow: "0 16px 40px rgba(245,158,11,0.20)",
-  },
-  actionsRow: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 14,
-  },
-  linkBtn: {
-    background: "transparent",
-    border: "none",
-    color: "rgba(255,255,255,0.80)",
-    fontSize: 13,
-    cursor: "pointer",
-    padding: 6,
-  },
-  dotSep: { color: "rgba(255,255,255,0.35)" },
-  tip: {
-    marginTop: 14,
-    padding: "10px 12px",
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.10)",
-    color: "rgba(255,255,255,0.72)",
-    fontSize: 12.5,
-    lineHeight: 1.4,
-  },
-  footer: { textAlign: "center", marginTop: 12 },
-  footerText: { color: "rgba(255,255,255,0.45)", fontSize: 12 },
-};

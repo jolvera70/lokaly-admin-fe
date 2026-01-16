@@ -1,7 +1,7 @@
 // src/pages/public/PublicProductPage.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { PUBLIC_BASE_URL, PUBLIC_ORIGIN } from "../../api";
+import { PUBLIC_BASE_URL } from "../../api";
 
 /* =======================
    Types
@@ -39,11 +39,26 @@ type OrderRequestPayload = {
    Helpers
 ======================= */
 
-function resolveImageUrl(rawUrl?: string | null): string | undefined {
+// Útil para armar URLs de assets que vienen como path.
+// - Si ya es http(s) => la deja
+// - Si empieza con /api => la deja (proxy en local)
+// - Si es /uploads o similar => en local la manda a https://lokaly.site, en prod al mismo origin
+export function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
-  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+
+  // ya absoluta
+  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+
   const path = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-  return `${PUBLIC_ORIGIN}${path}`;
+
+  // si ya viene con /api, en local lo resuelve el proxy, en prod es same-origin
+  if (path.startsWith("/api/")) return path;
+
+  // otros paths (ej. /uploads/.., /media/..) => en local prefijamos al server real
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const origin = isLocal ? "https://lokaly.site" : window.location.origin;
+
+  return `${origin}${path}`;
 }
 
 function cleanPhone(phone: string) {

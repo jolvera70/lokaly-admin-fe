@@ -14,9 +14,12 @@ type SuccessState = {
   title?: string;
 
   // ✅ créditos (recomendado)
-  credits?: number; // cuántas publicaciones compró el paquete
-  creditsUsed?: number; // opcional: cuántas ya usó (si el backend lo manda)
+  credits?: number; // comprados
+  creditsUsed?: number; // opcional: si el backend lo manda
   creditsLeft?: number; // opcional: si el backend lo manda directo
+
+  // opcional, visual
+  imagesCount?: number;
 
   // (opcional) NO usar como fuente de verdad para seguridad
   phoneE164?: string;
@@ -53,8 +56,7 @@ export default function PublishSuccessPage() {
   const location = useLocation();
   const state = (location.state || {}) as SuccessState;
 
-  // ✅ Gate: requiere cookie/sesión válida (expireAt no vencida)
-  // (tu hook ya redirige a /publicar si no hay sesión válida)
+  // ✅ Gate real: requiere cookie/sesión válida (el hook redirige si no hay)
   const { ok, phoneE164, phoneLocal, loading } = usePublishGuard({
     redirectTo: "/publicar",
   });
@@ -66,9 +68,8 @@ export default function PublishSuccessPage() {
   // ✅ Si pasas el gate pero entraste sin state (refresh/direct)
   useEffect(() => {
     if (loading) return;
-    if (!ok) return; // el guard ya redirige
+    if (!ok) return;
     if (!catalogUrl) {
-      // recomendado: regresar a producto para rehacer el paso anterior
       navigate("/publicar/producto", { replace: true });
     }
   }, [loading, ok, catalogUrl, navigate]);
@@ -78,25 +79,23 @@ export default function PublishSuccessPage() {
     return buildWhatsAppShareLink(catalogUrl);
   }, [catalogUrl]);
 
-  // ✅ créditos: preferir lo que venga del backend; si no, calcular con plan
+  // ✅ créditos: preferir backend; si no, fallback por plan
   const creditsPurchased = useMemo(() => {
     if (typeof state.credits === "number") return state.credits;
     return planCreditsFallback(state.plan);
   }, [state.credits, state.plan]);
 
   const creditsLeft = useMemo(() => {
-    // prioridad: backend
-    if (typeof state.creditsLeft === "number") return state.creditsLeft;
+    // prioridad: backend directo
+    if (typeof state.creditsLeft === "number") return Math.max(0, state.creditsLeft);
 
-    // si el backend manda creditsUsed
+    // si backend manda used
     if (typeof state.creditsUsed === "number") {
-      const left = creditsPurchased - state.creditsUsed;
-      return Math.max(0, left);
+      return Math.max(0, creditsPurchased - state.creditsUsed);
     }
 
-    // fallback: asumimos que ya usó 1 (publicó el producto actual)
-    const left = creditsPurchased - 1;
-    return Math.max(0, left);
+    // fallback: asumimos que ya consumió 1 por esta publicación
+    return Math.max(0, creditsPurchased - 1);
   }, [state.creditsLeft, state.creditsUsed, creditsPurchased]);
 
   const isPack = creditsPurchased > 1;
@@ -108,7 +107,6 @@ export default function PublishSuccessPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // fallback simple
       const el = document.createElement("textarea");
       el.value = catalogUrl;
       document.body.appendChild(el);
@@ -121,7 +119,7 @@ export default function PublishSuccessPage() {
   }
 
   function onPublishAnother() {
-    // ✅ usar datos “confiables” del guard (no de location.state)
+    // ✅ usar datos “confiables” del guard (no location.state)
     if (phoneE164 && phoneLocal) {
       navigate("/publicar/producto", {
         state: { phoneE164, phoneLocal },
@@ -131,16 +129,12 @@ export default function PublishSuccessPage() {
     navigate("/publicar");
   }
 
-  // mientras el guard decide / redirige
   if (loading) return null;
   if (!ok) return null;
-
-  // si no hay catalogUrl, el effect ya redirigió a /publicar/producto
   if (!catalogUrl) return null;
 
   return (
     <div className="lp">
-      {/* Header uniforme con landing */}
       <header className="lp__header">
         <div className="lp__headerInner">
           <button className="lp__brand" onClick={() => navigate("/")}>
@@ -171,9 +165,7 @@ export default function PublishSuccessPage() {
           <div className="lp__detailLeft">
             <div className="lp__detailKicker">Listo</div>
             <div className="lp__detailTitle">🎉 ¡Tu publicación ya está activa!</div>
-            <div className="lp__detailText">
-              Comparte tu link para empezar a recibir pedidos por WhatsApp.
-            </div>
+            <div className="lp__detailText">Comparte tu link para empezar a recibir pedidos por WhatsApp.</div>
 
             {/* ✅ Credits banner */}
             <div
@@ -198,7 +190,7 @@ export default function PublishSuccessPage() {
                 </>
               ) : (
                 <>
-                  ✅ Tu publicación quedará activa 30 días.
+                  ✅ Tu publicación quedará activa <strong>30 días</strong>.
                   <br />
                   Tip: si vas a subir varios productos, conviene un paquete.
                 </>
@@ -216,9 +208,7 @@ export default function PublishSuccessPage() {
                 boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 950, color: "rgba(15,23,42,0.65)" }}>
-                Tu catálogo
-              </div>
+              <div style={{ fontSize: 12, fontWeight: 950, color: "rgba(15,23,42,0.65)" }}>Tu catálogo</div>
 
               <div
                 style={{
@@ -234,12 +224,7 @@ export default function PublishSuccessPage() {
               </div>
 
               <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  className="lp__btn lp__btn--ghost"
-                  type="button"
-                  onClick={onCopy}
-                  style={{ flex: "1 1 180px" }}
-                >
+                <button className="lp__btn lp__btn--ghost" type="button" onClick={onCopy} style={{ flex: "1 1 180px" }}>
                   {copied ? "✅ Copiado" : "Copiar link"}
                 </button>
 
@@ -265,13 +250,8 @@ export default function PublishSuccessPage() {
               </div>
             </div>
 
-            {/* Secondary CTA */}
-            <button
-              className="lp__btn lp__btn--primary"
-              type="button"
-              onClick={onPublishAnother}
-              style={{ marginTop: 14, width: "100%" }}
-            >
+            {/* Primary CTA */}
+            <button className="lp__btn lp__btn--primary" type="button" onClick={onPublishAnother} style={{ marginTop: 14, width: "100%" }}>
               ➕ {creditsLeft > 0 ? "Publicar otro producto" : "Publicar otro producto (comprar paquete)"}
             </button>
 
@@ -305,6 +285,12 @@ export default function PublishSuccessPage() {
                   <br />
                   ✅ Pagaste: <strong>${state.amountPaid ?? "-"}</strong>
                   <br />
+                  {typeof state.imagesCount === "number" ? (
+                    <>
+                      ✅ Fotos: <strong>{state.imagesCount}</strong>
+                      <br />
+                    </>
+                  ) : null}
                   {isPack ? (
                     <>
                       ✅ Créditos comprados: <strong>{creditsPurchased}</strong>

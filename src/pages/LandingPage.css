@@ -512,3 +512,92 @@
 .lp__detailLeft form > div {
   max-width: 100%;
 }
+/* Header wrapper para que quede igual que tus otras pantallas */
+.lp__headerInner {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  height: 64px;
+}
+
+/* Form layout */
+.lp__form {
+  margin-top: 14px;
+}
+
+.lp__label {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(15, 23, 42, 0.75);
+}
+
+.lp__phoneRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.lp__countryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  font-weight: 800;
+  color: rgba(15, 23, 42, 0.85);
+  user-select: none;
+}
+
+.lp__flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lp__dial {
+  font-size: 13px;
+}
+
+.lp__input--phone {
+  flex: 1;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  padding: 0 12px;
+  outline: none;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.lp__hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.lp__meta {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.lp__error {
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 900;
+  color: rgba(127, 29, 29, 0.95);
+}
+
+/* Botón full width consistente */
+.lp__btn--block {
+  width: 100%;
+  margin-top: 14px;
+}

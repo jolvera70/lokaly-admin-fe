@@ -26,7 +26,7 @@ type Plan = {
   title: string;
   price: number;
   products: number;
-  badge?: string; // "Más vendido" | "Recomendado" | etc.
+  badge?: string;
   tone?: "plain" | "soft" | "featured";
 };
 
@@ -36,6 +36,10 @@ function formatMxMoney(n: number) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+
+  // ✅ un solo destino para “Publicar” y “Administrar”
+  // PublishStartPage decidirá: sesión -> entra, sin sesión -> OTP
+  const goPublishStart = useCallback(() => navigate("/publicar"), [navigate]);
 
   const steps: Step[] = useMemo(
     () => [
@@ -70,41 +74,14 @@ export default function LandingPage() {
     []
   );
 
-  // ✅ Pricing strategy: base $16 + packs 3/5/10
   const BASE_PRICE = 16;
 
   const plans: Plan[] = useMemo(
     () => [
-      {
-        key: "ONE",
-        title: "Probar Lokaly",
-        price: 16,
-        products: 1,
-        tone: "plain",
-      },
-      {
-        key: "PACK3",
-        title: "Para empezar bien",
-        price: 39,
-        products: 3,
-        tone: "soft",
-      },
-      {
-        key: "PACK5",
-        title: "Catálogo real",
-        price: 65,
-        products: 5,
-        badge: "Recomendado",
-        tone: "featured",
-      },
-      {
-        key: "PACK10",
-        title: "Todo tu catálogo",
-        price: 99,
-        products: 10,
-        badge: "⭐ Más vendido",
-        tone: "featured",
-      },
+      { key: "ONE", title: "Probar Lokaly", price: 16, products: 1, tone: "plain" },
+      { key: "PACK3", title: "Para empezar bien", price: 39, products: 3, tone: "soft" },
+      { key: "PACK5", title: "Catálogo real", price: 65, products: 5, badge: "Recomendado", tone: "featured" },
+      { key: "PACK10", title: "Todo tu catálogo", price: 99, products: 10, badge: "⭐ Más vendido", tone: "featured" },
     ],
     []
   );
@@ -146,7 +123,6 @@ export default function LandingPage() {
     if (dx < -45) prev();
   }
 
-  // ✅ Teclas (opcional desktop)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowLeft") prev();
@@ -169,16 +145,30 @@ export default function LandingPage() {
           </button>
 
           <nav className="lp__nav">
-            <Link className="lp__navLink" to="/">
-              Home
-            </Link>
-            <a className="lp__navLink" href="#how">
+            <Link className="lp__navLink" to="#how">
               Cómo funciona
-            </a>
+            </Link>
             <a className="lp__navLink" href="#contact">
               Contacto
             </a>
-            <button className="lp__navCta" onClick={() => navigate("/publicar")}>
+
+            {/* ✅ NUEVO: administrar productos (visible) */}
+            <button
+              className="lp__navLink"
+              type="button"
+              onClick={goPublishStart}
+              style={{
+                fontWeight: 900,
+                color: "rgba(15,23,42,0.78)",
+              }}
+              aria-label="Administrar mis productos"
+              title="Editar, pausar o eliminar publicaciones"
+            >
+              Administrar
+            </button>
+
+            {/* CTA principal */}
+            <button className="lp__navCta" onClick={goPublishStart}>
               Publicar
             </button>
           </nav>
@@ -200,7 +190,6 @@ export default function LandingPage() {
               Sin apps, sin comisiones.
             </p>
 
-            {/* ✅ Pricing: base + packs */}
             <div className="lp__prices">
               {plans.map((p) => {
                 const isFeatured = p.key === "PACK10" || p.key === "PACK5";
@@ -209,12 +198,8 @@ export default function LandingPage() {
                 return (
                   <div
                     key={p.key}
-                    className={[
-                      "lp__priceCard",
-                      isFeatured ? "lp__priceCard--featured" : "",
-                    ].join(" ")}
+                    className={["lp__priceCard", isFeatured ? "lp__priceCard--featured" : ""].join(" ")}
                     style={{
-                      // fondo suave para 3/5/10
                       background:
                         p.key === "ONE"
                           ? "#fff"
@@ -222,9 +207,7 @@ export default function LandingPage() {
                           ? "rgba(37,99,235,0.05)"
                           : "rgba(37,99,235,0.07)",
                       borderColor:
-                        p.key === "ONE"
-                          ? "rgba(15, 23, 42, 0.09)"
-                          : "rgba(37,99,235,0.18)",
+                        p.key === "ONE" ? "rgba(15, 23, 42, 0.09)" : "rgba(37,99,235,0.18)",
                     }}
                   >
                     {p.badge ? <div className="lp__badge">{p.badge}</div> : null}
@@ -248,19 +231,11 @@ export default function LandingPage() {
                     </div>
 
                     {save ? (
-                      <div
-                        style={{
-                          marginTop: 10,
-                          fontSize: 12,
-                          fontWeight: 900,
-                          color: "rgba(15,23,42,0.70)",
-                        }}
-                      >
+                      <div style={{ marginTop: 10, fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.70)" }}>
                         {save}
                       </div>
                     ) : null}
 
-                    {/* micro-empuje */}
                     {p.key === "PACK5" ? (
                       <div
                         style={{
@@ -283,17 +258,26 @@ export default function LandingPage() {
             </div>
 
             <div className="lp__ctaRow">
-              <button className="lp__btn lp__btn--primary" onClick={() => navigate("/publicar")}>
+              <button className="lp__btn lp__btn--primary" onClick={goPublishStart}>
                 Publicar mi producto
               </button>
+
+              {/* ✅ NUEVO: CTA secundario muy visible */}
+              <button
+                className="lp__btn lp__btn--ghost"
+                onClick={goPublishStart}
+                title="Editar, pausar o eliminar tus publicaciones"
+              >
+                Administrar mis productos
+              </button>
+
               <button className="lp__btn lp__btn--ghost" onClick={() => navigate("/ejemplo")}>
                 Ver ejemplo
               </button>
             </div>
 
             <div className="lp__micro">
-              ✓ Sin apps <span className="lp__dot">·</span> ✓ Sin comisiones{" "}
-              <span className="lp__dot">·</span> ✓ 30 días activo
+              ✓ Sin apps <span className="lp__dot">·</span> ✓ Sin comisiones <span className="lp__dot">·</span> ✓ 30 días activo
             </div>
 
             <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
@@ -310,22 +294,22 @@ export default function LandingPage() {
 
         {/* Step section */}
         <section className="lp__how" id="how">
-          {/* Panel que cambia texto/imagen */}
-          <div
-            className="lp__detail"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-          >
+          <div className="lp__detail" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
             <div className="lp__detailLeft">
               <div className="lp__detailKicker">Cómo funciona</div>
               <div className="lp__detailTitle">{current.detailTitle}</div>
               <div className="lp__detailText">{current.detailText}</div>
 
               <div className="lp__detailCtas">
-                <button className="lp__btn lp__btn--primary" onClick={() => navigate("/publicar")}>
+                <button className="lp__btn lp__btn--primary" onClick={goPublishStart}>
                   Publicar ahora
                 </button>
+
+                {/* ✅ NUEVO: administrar desde aquí también */}
+                <button className="lp__btn lp__btn--ghost" onClick={goPublishStart}>
+                  Administrar mis productos
+                </button>
+
                 <div className="lp__hint">Tip: En celular puedes deslizar ↔️</div>
               </div>
             </div>
@@ -337,7 +321,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Step bar */}
           <div className="lp__stepBar">
             <div className="lp__stepBarInner">
               <div className="lp__steps">
@@ -354,7 +337,6 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {/* Flechas: solo desktop (CSS las oculta en móvil) */}
               <div className="lp__stepNav" aria-label="Navegación de pasos">
                 <button className="lp__circleBtn" onClick={prev} aria-label="Anterior">
                   ‹

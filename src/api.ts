@@ -1,8 +1,10 @@
 // src/api.ts
 
-export const BASE_URL = "https://lokaly.site/api/admin";
-export const PUBLIC_BASE_URL = "https://lokaly.site/api/public";
-export const PUBLIC_ORIGIN = "https://lokaly.site";
+export const PUBLIC_ORIGIN = "";
+export const PUBLIC_PREFIX = "/api/public";
+export const publicUrl = (path: string) => `${PUBLIC_ORIGIN}${PUBLIC_PREFIX}${path}`;
+export const BASE_URL = "/api/public"; 
+export const PUBLIC_BASE_URL = "/api/public"; // ✅ siempre relativo (proxy en dev)
 
 export type PlanKey =
   | "ONE_PRODUCT"
@@ -24,6 +26,88 @@ export type NeighborSignupRequest = {
   zipCode: string;
 };
 
+export type PublisherCatalogMeResponse = {
+  id?: string;
+
+  phoneE164?: string;
+  phoneLocal?: string;
+  catalogSlug?: string;
+
+  creditsTotal?: number;
+  creditsUsed?: number;
+  creditsValidUntil?: string; // ISO date string
+
+  paused?: boolean;
+  deleted?: boolean;
+};
+
+/**
+ * GET mi catálogo del publisher (sesión por cookie lokaly_pub)
+ *
+ * ✅ AJUSTA AQUÍ el endpoint si tu BE lo expone distinto:
+ * - Ejemplos comunes:
+ *   - GET /api/public/v1/catalog/me
+ *   - GET /api/public/v1/publish/me
+ *   - GET /api/public/v1/publisher/me
+ */
+export async function getMyPublisherCatalog(): Promise<PublisherCatalogMeResponse> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/v1/catalog/me`, {
+    method: "GET",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    const err: any = new Error(txt || "No se pudo cargar tu catálogo.");
+    err.status = res.status;
+    throw err;
+  }
+
+  return res.json();
+}
+
+/** =========================
+ *  Publish Product (consume credits)
+ *  ========================= */
+
+export type PublishProductResponse = {
+  productId?: string;
+  status?: "PUBLISHED" | "OK";
+  catalogSlug?: string;
+};
+
+/**
+ * Publica el producto y consume 1 crédito
+ *
+ * ✅ AJUSTA AQUÍ el endpoint si tu BE lo expone distinto:
+ * - Ejemplos comunes:
+ *   - POST /api/public/v1/catalog/products/{productId}/publish
+ *   - POST /api/public/v1/publish/products/{productId}
+ *   - POST /api/public/v1/catalog/publish/{productId}
+ */
+export async function publishProduct(productId: string): Promise<PublishProductResponse> {
+  const res = await fetch(`${PUBLIC_BASE_URL}/v1/catalog/products/${productId}/publish`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}), // por si tu BE espera body, si no, no afecta
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    const err: any = new Error(txt || "No se pudo publicar el producto.");
+    err.status = res.status;
+    throw err;
+  }
+
+  // algunos endpoints devuelven vacío
+  const text = await res.text();
+  return text ? JSON.parse(text) : { productId, status: "OK" };
+}
 /* =========================
  * Helpers de headers
  * ========================= */
@@ -47,8 +131,17 @@ function getNeighborAuthHeaders() {
  * IMPORTANTE: credentials: "include" para que el navegador guarde y envíe la cookie.
  */
 async function publicFetch(input: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers || undefined);
+
+  // ✅ Si es FormData, NO debemos enviar Content-Type manual.
+  // El browser lo calcula con boundary.
+  if (init.body instanceof FormData) {
+    headers.delete("Content-Type");
+  }
+
   return fetch(input, {
     ...init,
+    headers,
     credentials: "include",
   });
 }
@@ -370,9 +463,10 @@ export type PublishSessionDto = {
  * y debe enviar cookie lokaly_pub (credentials include).
  */
 export async function getPublishSession(): Promise<PublishSessionDto | null> {
-  const res = await publicFetch(`${PUBLIC_BASE_URL}/v1/publish/session`, {
+  const res = await publicFetch(publicUrl(`/v1/publish/session`), {
     method: "GET",
     headers: { Accept: "application/json" },
+    credentials: "include",
   });
 
   if (res.status === 204 || res.status === 401) return null;
@@ -402,7 +496,7 @@ export type VerifyOtpRequest = {
 };
 
 export async function sendPublicOtp(phoneE164: string): Promise<SendOtpResponse> {
-  const res = await publicFetch(`${PUBLIC_BASE_URL}/v1/otp/send`, {
+  const res = await publicFetch(publicUrl(`/v1/otp/send`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phoneE164, channel: "WHATSAPP" } satisfies SendOtpRequest),
@@ -412,21 +506,309 @@ export async function sendPublicOtp(phoneE164: string): Promise<SendOtpResponse>
     const text = await res.text().catch(() => "");
     throw new Error(text || "Error al enviar OTP");
   }
-
   return res.json();
 }
 
 export async function verifyPublicOtp(otpSessionId: string, code: string): Promise<void> {
-  const res = await publicFetch(`${PUBLIC_BASE_URL}/v1/otp/verify`, {
+  const res = await publicFetch(publicUrl(`/v1/otp/verify`), {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ otpSessionId, code } satisfies VerifyOtpRequest),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || "OTP inválido o expirado");
+    // si quieres detectar status: throw Object.assign(new Error(text||...), { status: res.status })
+    const err = new Error(text || "OTP inválido o expirado");
+    (err as any).status = res.status;
+    throw err;
   }
 
   // 204 -> no json
 }
+
+export type CreateProductDraftResponse = {
+  productId: string;
+};
+
+export async function createPublishProductDraft(params: {
+  title: string;
+  price: string;
+  description?: string;
+  primaryIndex?: number;
+  images: File[];
+}): Promise<CreateProductDraftResponse> {
+  const fd = new FormData();
+  fd.append("title", params.title);
+  fd.append("price", params.price);
+  fd.append("description", params.description ?? "");
+  fd.append("primaryIndex", String(params.primaryIndex ?? 0));
+  params.images.forEach((file) => fd.append("images", file));
+
+  // 🔎 logs (temporal)
+  console.log("[DRAFT] url", publicUrl(`/v1/catalog/products/draft`));
+  console.log("[DRAFT] entries", [...fd.entries()].map(([k, v]) => [k, v instanceof File ? `${v.name} (${v.type})` : v]));
+
+  const res = await publicFetch(publicUrl(`/v1/catalog/products/draft`), {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo guardar el producto");
+    (err as any).status = res.status;
+    throw err;
+  }
+
+  return res.json();
+}
+
+// =========================
+// PUBLIC: Catalog plans
+// =========================
+
+export type CatalogPlanDto = {
+  key: string;            // ej: "ONE", "PACK3", "PACK5", "PACK10"
+  title: string;          // ej: "Paquete 5"
+  subtitle?: string;      // ej: "5 publicaciones"
+  price: number;          // ej: 65
+  credits: number;        // ej: 5
+  highlight?: "MOST_SOLD" | "RECOMMENDED" | null;
+  blurb?: string;
+  enabled?: boolean;      // opcional
+};
+
+export async function fetchCatalogPlans(): Promise<CatalogPlanDto[]> {
+  const res = await publicFetch(publicUrl(`/v1/catalog/plans`), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "No se pudieron cargar los planes");
+  }
+
+  return res.json();
+}
+
+// =========================
+// PUBLIC: Catalog checkout (publicación)
+// =========================
+
+export type CatalogCheckoutPlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
+
+export type CreateCatalogCheckoutResponse = {
+  orderId: string; // ✅ viene del BE
+  status: "PENDING" | "COMPLETED" | "CANCELLED";
+  amount: number;
+  currency: string;
+  credits: number;
+  daysValid: number;
+};
+
+export async function createCatalogCheckout(planKey: CatalogCheckoutPlanKey) {
+  const res = await publicFetch(publicUrl(`/v1/catalog/checkout`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ planKey }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo crear el checkout");
+    (err as any).status = res.status;
+    throw err;
+  }
+
+  return (await res.json()) as CreateCatalogCheckoutResponse;
+}
+
+export async function fakeCompleteCatalogCheckout(checkoutId: string) {
+  const res = await publicFetch(publicUrl(`/v1/catalog/checkout/${checkoutId}/fake-complete`), {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo completar el checkout");
+    (err as any).status = res.status;
+    throw err;
+  }
+
+  // puede devolver json o 204
+  return res.headers.get("content-type")?.includes("application/json")
+    ? res.json()
+    : undefined;
+}
+
+export async function publishCatalogProduct(productId: string) {
+  const res = await publicFetch(publicUrl(`/v1/catalog/products/${productId}/publish`), {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo publicar el producto");
+    (err as any).status = res.status;
+    throw err;
+  }
+
+  return res.json();
+}
+
+// ===== PUBLIC: Catalog Products (manage) =====
+
+export type CatalogProductDto = {
+  id: string;
+  title: string;
+  price: string;
+  description?: string | null;
+  imageUrls?: string[];
+  active?: boolean;     // o paused (depende tu modelo)
+  paused?: boolean;     // si tu response lo trae
+  deleted?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function listMyCatalogProducts(opts?: { draft?: boolean }) {
+  const qs = opts?.draft === undefined ? "" : `?draft=${opts.draft ? "true" : "false"}`;
+  const res = await publicFetch(publicUrl(`/v1/catalog/products${qs}`), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudieron cargar tus productos");
+    (err as any).status = res.status;
+    throw err;
+  }
+
+  return (await res.json()) as CatalogProductDto[];
+}
+
+export async function setCatalogProductPaused(productId: string, paused: boolean) {
+  const res = await publicFetch(publicUrl(`/v1/catalog/products/${productId}/paused`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paused }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo actualizar el estado del producto");
+    (err as any).status = res.status;
+    throw err;
+  }
+}
+
+export async function deleteCatalogProduct(productId: string) {
+  const res = await publicFetch(publicUrl(`/v1/catalog/products/${productId}`), {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo eliminar el producto");
+    (err as any).status = res.status;
+    throw err;
+  }
+}
+
+export async function getMyCatalogStats(range: "7d" | "30d" | "all" = "7d") {
+  const res = await publicFetch(publicUrl(`/v1/catalog/stats?range=${range}`), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => ""));
+  return (await res.json()) as CatalogStatsDto;
+}
+
+export async function listMyCatalogOrders() {
+  const res = await publicFetch(publicUrl(`/v1/catalog/orders`), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => ""));
+  return (await res.json()) as CatalogOrderDto[];
+}
+
+// =========================
+// Seller Dashboard (STUBS)
+// =========================
+
+// Ajusta estos types si ya tienes un modelo real de Order o Catalog
+export type CatalogOrderDto = {
+  id: string;
+  productId?: string;
+  productTitle?: string;
+  quantity?: number;
+  unitPrice?: string;
+  totalPrice?: string;
+  note?: string;
+  buyerName?: string;
+  buyerPhone?: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "DELIVERED" | string;
+  createdAt?: string;
+};
+
+export type CatalogStatsDto = {
+  catalogViews: number;
+  productViews: number;
+  ordersTotal: number;
+  ordersPending: number;
+};
+
+export type CatalogDashboardDto = {
+  catalog: {
+    id?: string;
+    catalogSlug?: string;
+    phoneLocal?: string;
+    creditsTotal?: number;
+    creditsUsed?: number;
+    creditsValidUntil?: string | null;
+  } | null;
+  stats: CatalogStatsDto | null;
+  products: CatalogProductDto[];
+  orders: CatalogOrderDto[];
+};
+
+/**
+ * ✅ STUB: por ahora no llama backend.
+ * Luego lo conectas a /api/public/v1/catalog/dashboard o /catalog/me
+ */
+export async function fetchMyCatalogDashboard(): Promise<CatalogDashboardDto> {
+  // Si quieres, puedes intentar llamar getMyPublisherCatalog + listMyCatalogProducts aquí,
+  // pero para "ver la página" lo dejamos simple.
+  return {
+    catalog: null,
+    stats: null,
+    products: [],
+    orders: [],
+  };
+}
+
+/**
+ * ✅ STUBS para acciones de pedidos (por ahora no hacen nada)
+ * Después los conectas a tus endpoints reales.
+ */
+export async function acceptCatalogOrder(orderId: string): Promise<void> {
+  void orderId;
+  return;
+}
+
+export async function rejectCatalogOrder(orderId: string): Promise<void> {
+  void orderId;
+  return;
+}
+
+// Ojo: ya existe markOrderDelivered(orderId) en tu api.ts
+// No creamos markCatalogOrderDelivered para evitar duplicidad.

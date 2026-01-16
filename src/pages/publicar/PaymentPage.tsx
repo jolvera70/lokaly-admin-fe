@@ -5,19 +5,25 @@ import "../LandingPage.css";
 
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 import { usePublishGuard } from "../../hooks/usePublishGuard";
+import { fetchCatalogPlans, createCatalogCheckout, fakeCompleteCatalogCheckout, publishCatalogProduct } from "../../api";
 
 type ProductDraft = {
   phoneE164: string;
   phoneLocal: string;
-  imageFile: File;
-  imagePreviewUrl: string;
+  images: { file: File; previewUrl: string }[];
+  primaryIndex: number;
   title: string;
   price: string;
   description: string;
 };
 
 type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
-type LocationState = ProductDraft;
+
+/** ✅ viene así desde ProductFormPage: navigate("/publicar/pago", { state: { productId, draft } }) */
+type LocationState = {
+  productId: string;
+  draft: ProductDraft;
+};
 
 function formatMxMoney(n: number) {
   return `$${n}`;
@@ -34,6 +40,7 @@ type Plan = {
   subtitle: string;
   price: number;
   credits: number;
+  daysValid?: number;
   highlight?: "MOST_SOLD" | "RECOMMENDED";
   blurb: string;
   bg?: "white" | "blueSoft";
@@ -41,13 +48,15 @@ type Plan = {
 
 const BASE_PRICE = 16;
 
-const PLANS: Plan[] = [
+// Fallback local (si el BE falla o todavía no tienes /plans)
+const FALLBACK_PLANS: Plan[] = [
   {
     key: "ONE",
     title: "1 publicación",
     subtitle: "30 días activo",
     price: 16,
     credits: 1,
+    daysValid: 30,
     blurb: "Ideal para probar con un producto.",
     bg: "white",
   },
@@ -57,6 +66,7 @@ const PLANS: Plan[] = [
     subtitle: "3 publicaciones",
     price: 39,
     credits: 3,
+    daysValid: 30,
     blurb: "Para empezar bien: sube tus 3 productos más pedidos y comparte un solo link.",
     bg: "white",
   },
@@ -66,6 +76,7 @@ const PLANS: Plan[] = [
     subtitle: "5 publicaciones",
     price: 65,
     credits: 5,
+    daysValid: 30,
     highlight: "RECOMMENDED",
     blurb: "Catálogo real: lo más práctico si vendes seguido (tus más vendidos en un solo link).",
     bg: "blueSoft",
@@ -76,6 +87,7 @@ const PLANS: Plan[] = [
     subtitle: "10 publicaciones",
     price: 99,
     credits: 10,
+    daysValid: 30,
     highlight: "MOST_SOLD",
     blurb: "Todo tu catálogo: publica varios productos y actualiza cuando quieras.",
     bg: "blueSoft",
@@ -91,56 +103,211 @@ function savingsText(plan: Plan) {
 }
 
 function planLabel(plan: Plan) {
-  if (plan.credits === 1) return "1 publicación · 30 días";
-  return `${plan.credits} publicaciones · 30 días`;
+  const days = plan.daysValid ?? 30;
+  if (plan.credits === 1) return `1 publicación · ${days} días`;
+  return `${plan.credits} publicaciones · ${days} días`;
+}
+
+function normalizePlans(raw: any): Plan[] | null {
+  try {
+    const list = Array.isArray(raw) ? raw : Array.isArray(raw?.plans) ? raw.plans : null;
+    if (!list) return null;
+
+    const mapped: Plan[] = list
+      .map((p: any) => {
+        const key = String(p.key ?? p.planKey ?? "").toUpperCase() as PlanKey;
+        if (!key) return null;
+
+        const credits = Number(p.credits ?? p.publications ?? 0);
+        const price = Number(p.amount ?? p.price ?? 0);
+        const daysValid = p.daysValid != null ? Number(p.daysValid) : undefined;
+
+        // si tu BE trae labels, usamos eso; si no, armamos defaults
+        const title =
+          p.title ??
+          (key === "ONE" ? "1 publicación" : key === "PACK3" ? "Paquete 3" : key === "PACK5" ? "Paquete 5" : "Paquete 10");
+
+        const subtitle = p.subtitle ?? (credits === 1 ? `${daysValid ?? 30} días activo` : `${credits} publicaciones`);
+        const blurb = p.blurb ?? "Publica tus productos y comparte un solo link.";
+        const highlight = (p.highlight as any) ?? undefined;
+        const bg = (p.bg as any) ?? (key === "PACK5" || key === "PACK10" ? "blueSoft" : "white");
+
+        if (!credits || !price) return null;
+
+        return {
+          key,
+          title,
+          subtitle,
+          price,
+          credits,
+          daysValid,
+          highlight,
+          blurb,
+          bg,
+        } as Plan;
+      })
+      .filter(Boolean) as Plan[];
+
+    // Validación mínima: que existan planes
+    if (!mapped.length) return null;
+
+    // Opcional: ordenar por credits
+    mapped.sort((a, b) => a.credits - b.credits);
+    return mapped;
+  } catch {
+    return null;
+  }
 }
 
 export default function PaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const draft = (location.state || null) as LocationState | null;
+
+  const state = (location.state || null) as LocationState | null;
+  const productId = state?.productId ?? null;
+  const draft = state?.draft ?? null;
 
   // ✅ Seguridad real: valida contra el BE (cookie lokaly_pub)
   const { loading: guardLoading, ok } = usePublishGuard({
     redirectTo: "/publicar",
   });
 
+  // planes dinámicos (desde BE)
+  const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [plansErr, setPlansErr] = useState<string | null>(null);
+
+  // selección de plan
+  const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
+
+  // loading del flujo de pago
+  const [loading, setLoading] = useState(false);
+
+  // opcional: mensaje de error de pago
+  const [payErr, setPayErr] = useState<string | null>(null);
+
   useEffect(() => {
     if (guardLoading) return;
     if (!ok) return; // el guard ya redirigió
-    if (!draft?.phoneE164 || !draft?.phoneLocal || !draft?.title || !draft?.price) {
+
+    const hasImages = Boolean(draft?.images?.length);
+    if (!productId || !draft?.phoneE164 || !draft?.phoneLocal || !draft?.title || !draft?.price || !hasImages) {
       navigate("/publicar/producto", { replace: true });
     }
-  }, [guardLoading, ok, draft, navigate]);
+  }, [guardLoading, ok, draft, productId, navigate]);
 
-  const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
-  const [loading, setLoading] = useState(false);
+  // cargar planes desde BE
+  useEffect(() => {
+    if (guardLoading) return;
+    if (!ok) return;
 
-  const selectedPlan = useMemo(() => {
-    return PLANS.find((p) => p.key === planKey) ?? PLANS[0];
-  }, [planKey]);
+    let alive = true;
 
-  const priceToPay = selectedPlan.price;
+    (async () => {
+      try {
+        setPlansLoading(true);
+        setPlansErr(null);
+
+        const res = await fetchCatalogPlans(); // ✅ /api/public/v1/catalog/plans
+        const normalized = normalizePlans(res);
+
+        if (!alive) return;
+
+        if (normalized && normalized.length) {
+          setPlans(normalized);
+
+          // si el planKey actual no existe, set al último (el de más créditos)
+          const exists = normalized.some((p) => p.key === planKey);
+          if (!exists) setPlanKey(normalized[normalized.length - 1].key);
+        } else {
+          // fallback silencioso
+          setPlans(FALLBACK_PLANS);
+        }
+      } catch (e: any) {
+        if (!alive) return;
+        setPlans(FALLBACK_PLANS);
+        setPlansErr("No pudimos cargar los paquetes. Mostrando precios por defecto.");
+      } finally {
+        if (alive) setPlansLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardLoading, ok]);
+
+  const selectedPlan = useMemo(() => plans.find((p) => p.key === planKey) ?? plans[0], [plans, planKey]);
+  const priceToPay = selectedPlan?.price ?? 0;
+
+  // ✅ imagen principal a mostrar en resumen (usa primaryIndex del form)
+  const safePrimaryIndex = useMemo(() => {
+    const len = draft?.images?.length ?? 0;
+    if (len === 0) return 0;
+    const pi = draft?.primaryIndex ?? 0;
+    return Math.max(0, Math.min(pi, len - 1));
+  }, [draft?.images?.length, draft?.primaryIndex]);
+
+  const primaryPreview = draft?.images?.[safePrimaryIndex]?.previewUrl ?? null;
 
   async function onPay() {
-    if (!draft) return;
+    if (!draft || !productId) return;
+    if (!selectedPlan) return;
 
     setLoading(true);
+    setPayErr(null);
+
     try {
+      // 1) crear checkout (order PENDING)
+      const order = await createCatalogCheckout(planKey);
+      // esperado:
+      // { orderId, status:"PENDING", amount, currency, credits, daysValid }
+      const orderId = (order as any)?.orderId as string | undefined;
+      if (!orderId) throw new Error("ORDER_ID_MISSING");
+
+      // 2) fake complete (simula el pago)
+      await fakeCompleteCatalogCheckout(orderId);
+
+      // 3) publicar producto (consume 1 crédito ATÓMICO)
+      const published = await publishCatalogProduct(productId);
+
+      // 4) navegar a listo
       const slug = makeCatalogSlugFromPhone(draft.phoneLocal);
       const link = `https://lokaly.site/catalog/${slug}`;
 
       navigate("/publicar/listo", {
+        replace: true,
         state: {
+          productId,
+          orderId,
           catalogUrl: link,
           plan: planKey,
-          amountPaid: priceToPay,
+          amountPaid: order.amount ?? priceToPay,
+          currency: order.currency ?? "MXN",
+          credits: order.credits ?? selectedPlan.credits,
+          daysValid: order.daysValid ?? selectedPlan.daysValid ?? 30,
           title: draft.title,
           phoneE164: draft.phoneE164,
           phoneLocal: draft.phoneLocal,
-          credits: selectedPlan.credits,
+          imagesCount: draft.images?.length ?? 0,
+          published, // opcional
         },
       });
+    } catch (err: any) {
+      const status = err?.status ?? err?.response?.status;
+      const msgRaw = String(err?.message ?? "");
+
+      // errores típicos de tu BE (por si los mandas como texto)
+      if (status === 401) {
+        setPayErr("Tu sesión expiró. Vuelve a verificar tu número.");
+      } else if (msgRaw.includes("NO_CREDITS")) {
+        setPayErr("No se pudieron asignar créditos. Intenta nuevamente.");
+      } else if (msgRaw.includes("ACCESS_EXPIRED")) {
+        setPayErr("Tu acceso expiró. Vuelve a verificar tu número.");
+      } else {
+        setPayErr("No se pudo completar el pago/publicación. Intenta nuevamente.");
+      }
     } finally {
       setLoading(false);
     }
@@ -148,7 +315,7 @@ export default function PaymentPage() {
 
   if (guardLoading) return null;
   if (!ok) return null;
-  if (!draft) return null;
+  if (!draft || !productId) return null;
 
   return (
     <div className="lp">
@@ -181,6 +348,7 @@ export default function PaymentPage() {
           <div className="lp__detailLeft">
             <div className="lp__detailKicker">Pago</div>
             <div className="lp__detailTitle">Elige tu paquete</div>
+
             <div className="lp__detailText">
               Pagas por publicación. <strong>Sin comisiones por venta.</strong>
               <div style={{ marginTop: 6, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
@@ -188,8 +356,25 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-              {PLANS.map((p) => {
+            {plansErr ? (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: 10,
+                  borderRadius: 14,
+                  border: "1px solid rgba(245,158,11,0.25)",
+                  background: "rgba(245,158,11,0.10)",
+                  color: "rgba(15,23,42,0.78)",
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                {plansErr}
+              </div>
+            ) : null}
+
+            <div style={{ marginTop: 14, display: "grid", gap: 10, opacity: plansLoading ? 0.85 : 1 }}>
+              {plans.map((p) => {
                 const isActive = p.key === planKey;
                 const isBlue = p.bg === "blueSoft";
 
@@ -205,17 +390,17 @@ export default function PaymentPage() {
                     key={p.key}
                     type="button"
                     onClick={() => setPlanKey(p.key)}
+                    disabled={loading}
                     style={{
                       textAlign: "left",
                       borderRadius: 18,
-                      border: isActive
-                        ? "2px solid rgba(37,99,235,0.55)"
-                        : "1px solid rgba(15,23,42,0.10)",
+                      border: isActive ? "2px solid rgba(37,99,235,0.55)" : "1px solid rgba(15,23,42,0.10)",
                       background: isBlue ? "rgba(37,99,235,0.06)" : "#fff",
                       padding: 14,
-                      cursor: "pointer",
+                      cursor: loading ? "not-allowed" : "pointer",
                       boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
                       position: "relative",
+                      opacity: loading ? 0.8 : 1,
                     }}
                   >
                     {badge ? (
@@ -242,12 +427,8 @@ export default function PaymentPage() {
                         {p.title} — <span style={{ fontSize: 18 }}>{formatMxMoney(p.price)}</span>
                       </div>
                       <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.60)" }}>
-                        {p.subtitle}
+                        {p.credits} publicaciones
                       </div>
-                    </div>
-
-                    <div style={{ marginTop: 6, fontSize: 13, color: "rgba(15,23,42,0.70)", lineHeight: 1.4 }}>
-                      {p.blurb}
                     </div>
 
                     {savingsText(p) ? (
@@ -277,19 +458,37 @@ export default function PaymentPage() {
               })}
             </div>
 
+            {payErr ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 14,
+                  border: "1px solid rgba(239,68,68,0.22)",
+                  background: "rgba(239,68,68,0.08)",
+                  color: "rgba(15,23,42,0.80)",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  lineHeight: 1.4,
+                }}
+              >
+                {payErr}
+              </div>
+            ) : null}
+
             <button
               className="lp__btn lp__btn--primary"
               type="button"
               onClick={onPay}
-              disabled={loading}
+              disabled={loading || plansLoading}
               style={{
                 marginTop: 14,
                 width: "100%",
-                opacity: loading ? 0.7 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading || plansLoading ? 0.7 : 1,
+                cursor: loading || plansLoading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "Procesando pago..." : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
+              {loading ? "Procesando..." : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
             </button>
 
             <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
@@ -306,7 +505,7 @@ export default function PaymentPage() {
               <div style={{ width: "100%" }}>
                 <div style={{ fontWeight: 950, marginBottom: 10 }}>Resumen</div>
 
-                {draft.imagePreviewUrl ? (
+                {primaryPreview ? (
                   <div
                     style={{
                       borderRadius: 16,
@@ -316,10 +515,50 @@ export default function PaymentPage() {
                     }}
                   >
                     <img
-                      src={draft.imagePreviewUrl}
+                      src={primaryPreview}
                       alt={draft.title}
-                      style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }}
+                      style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }}
                     />
+                  </div>
+                ) : null}
+
+                {draft.images?.length > 1 ? (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      display: "flex",
+                      gap: 10,
+                      overflowX: "auto",
+                      paddingBottom: 6,
+                    }}
+                    aria-label="Fotos del producto"
+                  >
+                    {draft.images.map((img, idx) => {
+                      const active = idx === safePrimaryIndex;
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            minWidth: 64,
+                            width: 64,
+                            height: 64,
+                            borderRadius: 14,
+                            overflow: "hidden",
+                            border: active ? "2px solid rgba(245,158,11,0.95)" : "1px solid rgba(15,23,42,0.12)",
+                            boxShadow: active ? "0 0 0 4px rgba(245,158,11,0.14)" : "none",
+                            background: "#fff",
+                            flex: "0 0 auto",
+                          }}
+                          title={active ? "Principal" : `Foto ${idx + 1}`}
+                        >
+                          <img
+                            src={img.previewUrl}
+                            alt={`Foto ${idx + 1}`}
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
 
@@ -350,42 +589,9 @@ export default function PaymentPage() {
                     ✅ Sin comisiones por venta
                   </div>
 
-                  <div
-                    style={{
-                      marginTop: 12,
-                      padding: 12,
-                      borderRadius: 14,
-                      border: "1px solid rgba(15,23,42,0.10)",
-                      background: "rgba(37,99,235,0.06)",
-                      color: "rgba(15,23,42,0.78)",
-                      fontSize: 12,
-                      fontWeight: 800,
-                    }}
-                  >
-                    Tip: Con {selectedPlan.credits > 1 ? `paquete de ${selectedPlan.credits}` : "1 publicación"} armas tu catálogo más rápido.
+                  <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)", fontWeight: 800 }}>
+                    📷 Fotos: {draft.images?.length ?? 0}
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 12,
-                    padding: 12,
-                    borderRadius: 14,
-                    border: "1px solid rgba(15,23,42,0.10)",
-                    background: "#fff",
-                    fontSize: 12,
-                    color: "rgba(15,23,42,0.70)",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  <div style={{ fontWeight: 950, marginBottom: 6 }}>Precio por publicación</div>
-                  {selectedPlan.credits === 1 ? (
-                    <div>• {formatMxMoney(BASE_PRICE)} por producto</div>
-                  ) : (
-                    <div>
-                      • {formatMxMoney(Math.round((selectedPlan.price / selectedPlan.credits) * 10) / 10)} por producto aprox.
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

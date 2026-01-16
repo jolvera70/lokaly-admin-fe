@@ -1,5 +1,6 @@
 // src/hooks/usePublishSession.ts
 import { useEffect, useState } from "react";
+import { publicUrl } from "../api";
 
 export type PublishSession = {
   phoneE164: string;
@@ -14,17 +15,38 @@ export function usePublishSession() {
   const [session, setSession] = useState<PublishSession | null>(null);
 
   useEffect(() => {
-    fetch("https://lokaly.site/api/public/v1/publish/session", {
-      credentials: "include", // 👈 MUY IMPORTANTE
-      headers: { Accept: "application/json" },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("NO_SESSION");
-        return (await res.json()) as PublishSession;
-      })
-      .then(setSession)
-      .catch(() => setSession(null))
-      .finally(() => setLoading(false));
+    let alive = true;
+
+    (async () => {
+      try {
+        const res = await fetch(publicUrl(`/v1/publish/session`), {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+
+        // ✅ NO SESSION es normal
+        if (res.status === 401 || res.status === 204) {
+          if (alive) setSession(null);
+          return;
+        }
+
+        if (!res.ok) {
+          if (alive) setSession(null);
+          return;
+        }
+
+        const data = (await res.json()) as PublishSession;
+        if (alive) setSession(data);
+      } catch {
+        if (alive) setSession(null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   return { loading, session };

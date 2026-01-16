@@ -13,7 +13,7 @@ function isSessionValid(session: PublishSession | null) {
   if (!session.phoneE164 || !session.phoneLocal) return false;
 
   // ✅ debe estar verificado
-  if (!session.verified) return false;
+  if (session.verified === false) return false;
 
   // ✅ expiresAt (del BE) debe ser futuro
   const t = new Date(session.expiresAt).getTime();

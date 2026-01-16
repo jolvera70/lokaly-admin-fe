@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+// src/pages/catalog/PublicCatalogPage.tsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { PUBLIC_BASE_URL, PUBLIC_ORIGIN } from "../../api";
+import { PUBLIC_BASE_URL } from "../../api";
 
 /* =======================
    Types
@@ -35,11 +36,22 @@ type PublicCatalogResponse = {
    Helpers
 ======================= */
 
-function resolveImageUrl(rawUrl?: string | null): string | undefined {
+export function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
-  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+
+  // ya absoluta
+  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+
   const path = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-  return `${PUBLIC_ORIGIN}${path}`;
+
+  // si ya viene con /api, en local lo resuelve el proxy, en prod es same-origin
+  if (path.startsWith("/api/")) return path;
+
+  const isLocal =
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const origin = isLocal ? "https://lokaly.site" : window.location.origin;
+
+  return `${origin}${path}`;
 }
 
 function cleanPhone(phone: string) {
@@ -69,6 +81,29 @@ function clamp(lines: number): React.CSSProperties {
   };
 }
 
+function safeNumber(v: any): number {
+  if (v == null) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    // soporta "99", "99.50", "$99", "99,000"
+    const cleaned = v.replace(/[^\d.]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
+  // BigDecimal-like
+  if (typeof v === "object" && typeof v.toString === "function") {
+    const s = String(v.toString());
+    const cleaned = s.replace(/[^\d.]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function isFalseyBoolean(v: any) {
+  return v === false || v === "false" || v === 0 || v === "0";
+}
+
 /* =======================
    Image carousel with zoom
 ======================= */
@@ -77,10 +112,11 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
   const [index, setIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!images || images.length === 0) return null;
+  const safeImages = useMemo(() => (images || []).filter(Boolean), [images]);
+  if (!safeImages.length) return null;
 
-  const total = images.length;
-  const current = images[index];
+  const total = safeImages.length;
+  const current = safeImages[index] ?? safeImages[0];
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -119,7 +155,7 @@ function ProductImageCarousel({ images, alt }: { images: string[]; alt: string }
 
         {total > 1 && (
           <div style={s.dots}>
-            {images.map((_, i) => (
+            {safeImages.map((_, i) => (
               <div
                 key={i}
                 style={{
@@ -183,6 +219,86 @@ function sortProducts(list: PublicProduct[], sort: SortKey) {
 }
 
 /* =======================
+   Normalizers
+======================= */
+
+function normalizeSeller(raw: any, slug: string): PublicSeller {
+  const sRaw = raw?.seller ?? raw?.catalog?.seller ?? raw?.publisher ?? raw?.owner ?? raw?.catalog ?? raw;
+
+  const name =
+    sRaw?.fullName ??
+    sRaw?.name ??
+    sRaw?.displayName ??
+    sRaw?.title ??
+    "Vendedor";
+
+  const whatsapp =
+    sRaw?.whatsapp ??
+    sRaw?.phoneNumber ??
+    sRaw?.phone ??
+    sRaw?.phoneE164 ??
+    undefined;
+
+  return {
+    id: sRaw?.id ?? sRaw?.sellerId ?? sRaw?.publisherId ?? "unknown",
+    name,
+    slug: sRaw?.slug ?? sRaw?.publicSlug ?? slug,
+    avatarUrl: resolveImageUrl(sRaw?.avatarUrl ?? sRaw?.avatar ?? sRaw?.photoUrl),
+    description: sRaw?.description ?? sRaw?.bio ?? undefined,
+    clusterName: sRaw?.clusterName ?? sRaw?.colonyName ?? sRaw?.cluster ?? undefined,
+    whatsapp,
+  };
+}
+
+function normalizeProducts(raw: any): PublicProduct[] {
+  const list = raw?.products ?? raw?.items ?? raw?.data ?? [];
+  if (!Array.isArray(list)) return [];
+
+  return list
+    .map((p: any) => {
+      const rawImages: string[] = Array.isArray(p?.imageUrls)
+        ? p.imageUrls
+        : Array.isArray(p?.images)
+        ? p.images
+        : [];
+
+      const single: string | undefined =
+        p?.imageUrl ?? p?.image ?? p?.thumbnail ?? undefined;
+
+      const resolvedImages = [
+        ...rawImages.map((u) => resolveImageUrl(u)).filter(Boolean),
+      ] as string[];
+
+      if (single) {
+        const s = resolveImageUrl(single);
+        if (s) resolvedImages.push(s);
+      }
+
+      const active = p?.active;
+      const deleted = p?.deleted;
+      const draft = p?.draft;
+      const paused = p?.paused;
+
+      const isVisible =
+        !isFalseyBoolean(active) &&
+        !isFalseyBoolean(deleted) &&
+        !isFalseyBoolean(draft) &&
+        !isFalseyBoolean(paused);
+
+      return {
+        id: p?.id ?? p?._id ?? "",
+        name: p?.title ?? p?.name ?? "Producto",
+        price: safeNumber(p?.price),
+        imageUrls: resolvedImages,
+        shortDescription: p?.shortDescription ?? p?.description ?? undefined,
+        featured: !!(p?.featured ?? p?.isFeatured),
+        active: isVisible,
+      } as PublicProduct;
+    })
+    .filter((p: PublicProduct) => !!p.id && p.active !== false);
+}
+
+/* =======================
    Page
 ======================= */
 
@@ -194,13 +310,12 @@ export function PublicCatalogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters (los de la versión anterior)
+  // Filters
   const [query, setQuery] = useState("");
   const [searchInDescription, setSearchInDescription] = useState(true);
   const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [sort, setSort] = useState<SortKey>("FEATURED");
 
-  
   const loadCatalog = useCallback(async () => {
     if (!slug) return;
 
@@ -208,58 +323,35 @@ export function PublicCatalogPage() {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${PUBLIC_BASE_URL}/catalog/${slug}`);
-      if (!res.ok) throw new Error("No se pudo cargar el catálogo.");
+      const res = await fetch(`${PUBLIC_BASE_URL}/v1/public/catalog/${encodeURIComponent(slug)}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      if (res.status === 404) {
+        throw new Error("Catálogo no encontrado.");
+      }
+      if (!res.ok) {
+        throw new Error("No se pudo cargar el catálogo.");
+      }
 
       const raw = await res.json();
 
       const normalized: PublicCatalogResponse = {
-        seller: {
-          id: raw.seller.id,
-          name: raw.seller.fullName ?? raw.seller.name,
-          slug: raw.seller.slug,
-          avatarUrl: resolveImageUrl(raw.seller.avatarUrl),
-          description: raw.seller.description,
-          clusterName: raw.seller.clusterName ?? raw.seller.colonyName,
-          whatsapp: raw.seller.whatsapp,
-        },
-        products: (raw.products ?? [])
-          .map((p: any) => {
-            const rawImages: string[] = Array.isArray(p.imageUrls)
-              ? p.imageUrls
-              : Array.isArray(p.images)
-              ? p.images
-              : [];
-
-            const single =
-              (p.imageUrl as string | undefined) || (p.image as string | undefined);
-
-            const resolvedImages = [
-              ...rawImages.map((u) => resolveImageUrl(u)).filter(Boolean),
-            ] as string[];
-
-            if (single) {
-              const s = resolveImageUrl(single);
-              if (s) resolvedImages.push(s);
-            }
-
-            return {
-              id: p.id,
-              name: p.title ?? p.name,
-              price: Number(p.price ?? 0),
-              imageUrls: resolvedImages,
-              shortDescription: p.shortDescription ?? p.description,
-              featured: !!p.featured,
-              active: p.active !== false,
-            } as PublicProduct;
-          })
-          .filter((p: PublicProduct) => p.active !== false),
+        seller: normalizeSeller(raw, slug),
+        products: normalizeProducts(raw),
       };
+
+      // si no hay productos visibles => mejor tratarlo como “no encontrado”
+      if (!normalized.products.length) {
+        throw new Error("Catálogo no encontrado.");
+      }
 
       setData(normalized);
     } catch (e: any) {
       console.error(e);
-      setError(e.message || "Error cargando catálogo");
+      setError(e?.message || "Error cargando catálogo");
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -282,10 +374,7 @@ export function PublicCatalogPage() {
 
   const openWhatsAppGeneral = () => {
     if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
-    openWhatsApp(
-      seller.whatsapp,
-      `Hola! Vi tu catálogo (${window.location.href}) y me interesa un producto.`
-    );
+    openWhatsApp(seller.whatsapp, `Hola! Vi tu catálogo (${window.location.href}) y me interesa un producto.`);
   };
 
   const filteredProducts = useMemo(() => {
@@ -337,7 +426,6 @@ export function PublicCatalogPage() {
   return (
     <div style={s.page}>
       <div style={s.container}>
-        {/* Header like app */}
         <header style={s.header}>
           <div style={s.brandRow}>
             <div style={s.brandIcon}>⌂</div>
@@ -353,18 +441,18 @@ export function PublicCatalogPage() {
             <div style={s.headerRight}>
               <button onClick={copyCatalogLink} style={s.iconBtn} aria-label="Copiar link">
                 <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="gray"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="gray"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
               </button>
               <button onClick={openWhatsAppGeneral} style={s.iconBtn} aria-label="WhatsApp">
                 💬
@@ -372,7 +460,6 @@ export function PublicCatalogPage() {
             </div>
           </div>
 
-          {/* Controls (filtros reales) */}
           <div style={s.controlsCard}>
             <div style={s.searchWrap}>
               <input
@@ -394,19 +481,12 @@ export function PublicCatalogPage() {
             <div style={s.filtersRow}>
               <button
                 onClick={() => setOnlyFeatured((v) => !v)}
-                style={{
-                  ...s.chip,
-                  ...(onlyFeatured ? s.chipActive : null),
-                }}
+                style={{ ...s.chip, ...(onlyFeatured ? s.chipActive : null) }}
               >
                 {onlyFeatured ? "✓ " : ""}Solo destacados
               </button>
 
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                style={s.select}
-              >
+              <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} style={s.select}>
                 <option value="FEATURED">Orden: destacados</option>
                 <option value="PRICE_ASC">Precio: menor a mayor</option>
                 <option value="PRICE_DESC">Precio: mayor a menor</option>
@@ -428,7 +508,6 @@ export function PublicCatalogPage() {
           </div>
         </header>
 
-        {/* Grid */}
         <main style={{ marginTop: 12 }}>
           {filteredProducts.length === 0 ? (
             <div style={s.empty}>
@@ -482,20 +561,24 @@ export function PublicCatalogPage() {
    Tiny toast (sin libs)
 ======================= */
 
-let toastTimer: any = null;
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
 function toast(msg: string) {
   const elId = "lokaly-toast";
   let el = document.getElementById(elId);
+
   if (!el) {
     el = document.createElement("div");
     el.id = elId;
     document.body.appendChild(el);
   }
+
   el.textContent = msg;
   Object.assign(el.style, s.toast);
   el.style.opacity = "1";
 
-  clearTimeout(toastTimer);
+  if (toastTimer) clearTimeout(toastTimer);
+
   toastTimer = setTimeout(() => {
     if (el) el.style.opacity = "0";
   }, 1100);
@@ -506,31 +589,12 @@ function toast(msg: string) {
 ======================= */
 
 const s: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#F6F6F4",
-    color: "#111827",
-  },
-  container: {
-    maxWidth: 980,
-    margin: "0 auto",
-    padding: "16px 14px 26px",
-  },
+  page: { minHeight: "100vh", background: "#F6F6F4", color: "#111827" },
+  container: { maxWidth: 980, margin: "0 auto", padding: "16px 14px 26px" },
 
-  header: {
-    position: "sticky",
-    top: 0,
-    zIndex: 20,
-    background: "#F6F6F4",
-    paddingBottom: 10,
-  },
+  header: { position: "sticky", top: 0, zIndex: 20, background: "#F6F6F4", paddingBottom: 10 },
 
-  brandRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    paddingTop: 4,
-  },
+  brandRow: { display: "flex", alignItems: "center", gap: 10, paddingTop: 4 },
   brandIcon: {
     width: 34,
     height: 34,
@@ -565,12 +629,7 @@ const s: Record<string, React.CSSProperties> = {
     boxShadow: "0 10px 22px rgba(17,24,39,0.06)",
   },
 
-  searchWrap: {
-    borderRadius: 14,
-    background: "#F9FAFB",
-    border: "1px solid #E5E7EB",
-    padding: 10,
-  },
+  searchWrap: { borderRadius: 14, background: "#F9FAFB", border: "1px solid #E5E7EB", padding: 10 },
   searchInput: {
     width: "100%",
     border: "none",
@@ -580,15 +639,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     background: "#FFFFFF",
   },
-  checkboxRow: {
-    marginTop: 10,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 13,
-    color: "#111827",
-    fontWeight: 700,
-  },
+  checkboxRow: { marginTop: 10, display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#111827", fontWeight: 700 },
 
   filtersRow: {
     marginTop: 10,
@@ -609,10 +660,7 @@ const s: Record<string, React.CSSProperties> = {
     color: "#111827",
     whiteSpace: "nowrap",
   },
-  chipActive: {
-    background: "#F5E7B6",
-    border: "1px solid #E7D28A",
-  },
+  chipActive: { background: "#F5E7B6", border: "1px solid #E7D28A" },
 
   select: {
     padding: "10px 12px",
@@ -646,11 +694,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 950,
   },
 
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 12,
-  },
+  grid: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 },
 
   card: {
     background: "#fff",
@@ -662,25 +706,10 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: "column",
   },
 
-  cardBody: {
-    padding: 10,
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
+  cardBody: { padding: 10, display: "flex", flexDirection: "column", gap: 6 },
 
-  cardTitle: {
-    fontWeight: 1000,
-    fontSize: 14,
-    color: "#111827",
-    ...clamp(1),
-  },
-
-  cardPrice: {
-    fontWeight: 1000,
-    fontSize: 14,
-    color: "#111827",
-  },
+  cardTitle: { fontWeight: 1000, fontSize: 14, color: "#111827", ...clamp(1) },
+  cardPrice: { fontWeight: 1000, fontSize: 14, color: "#111827" },
 
   statusRow: { display: "flex", gap: 8, alignItems: "center" },
   statusAvailable: { color: "#16A34A", fontWeight: 900, fontSize: 12 },
@@ -710,17 +739,6 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: "#111827",
   },
-  btnWhatsWide: {
-    flex: 1,
-    padding: "10px 12px",
-    borderRadius: 999,
-    border: "none",
-    background: "#22C55E",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: 950,
-    fontSize: 12,
-  },
 
   noImg: {
     height: 155,
@@ -732,12 +750,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 900,
   },
 
-  footer: {
-    textAlign: "center",
-    marginTop: 16,
-    color: "#9CA3AF",
-    fontSize: 12,
-  },
+  footer: { textAlign: "center", marginTop: 16, color: "#9CA3AF", fontSize: 12 },
 
   empty: {
     background: "#fff",
@@ -749,42 +762,16 @@ const s: Record<string, React.CSSProperties> = {
   emptyTitle: { fontWeight: 1000, fontSize: 16 },
   emptyText: { marginTop: 6, color: "#6B7280", fontSize: 13 },
 
-  errorCard: {
-    background: "#fff",
-    border: "1px solid #FCA5A5",
-    borderRadius: 18,
-    padding: 14,
-  },
+  errorCard: { background: "#fff", border: "1px solid #FCA5A5", borderRadius: 18, padding: 14 },
   errorTitle: { fontWeight: 1000, color: "#991B1B" },
   errorText: { marginTop: 6, color: "#6B7280" },
 
-  skeletonTop: {
-    height: 180,
-    borderRadius: 18,
-    background: "#ECECEC",
-    border: "1px solid #E5E7EB",
-  },
-  skeletonGrid: {
-    marginTop: 12,
-    height: 420,
-    borderRadius: 18,
-    background: "#ECECEC",
-    border: "1px solid #E5E7EB",
-  },
+  skeletonTop: { height: 180, borderRadius: 18, background: "#ECECEC", border: "1px solid #E5E7EB" },
+  skeletonGrid: { marginTop: 12, height: 420, borderRadius: 18, background: "#ECECEC", border: "1px solid #E5E7EB" },
 
   /* carousel */
-  media: {
-    position: "relative",
-    width: "100%",
-    backgroundColor: "#F3F4F6",
-    cursor: "zoom-in",
-  },
-  mediaImg: {
-    width: "100%",
-    height: 155,
-    objectFit: "cover",
-    display: "block",
-  },
+  media: { position: "relative", width: "100%", backgroundColor: "#F3F4F6", cursor: "zoom-in" },
+  mediaImg: { width: "100%", height: 155, objectFit: "cover", display: "block" },
   mediaNavLeft: {
     position: "absolute",
     top: "50%",
@@ -824,11 +811,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 999,
     backgroundColor: "rgba(17,24,39,0.45)",
   },
-  dot: {
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: "#FACC15",
-  },
+  dot: { height: 7, borderRadius: 999, backgroundColor: "#FACC15" },
 
   modalBackdrop: {
     position: "fixed",
@@ -840,19 +823,8 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     padding: 16,
   },
-  modalFrame: {
-    position: "relative",
-    maxWidth: "min(980px, 100%)",
-    maxHeight: "90vh",
-    width: "100%",
-  },
-  modalImg: {
-    width: "100%",
-    maxHeight: "90vh",
-    objectFit: "contain",
-    borderRadius: 18,
-    backgroundColor: "#000",
-  },
+  modalFrame: { position: "relative", maxWidth: "min(980px, 100%)", maxHeight: "90vh", width: "100%" },
+  modalImg: { width: "100%", maxHeight: "90vh", objectFit: "contain", borderRadius: 18, backgroundColor: "#000" },
   modalClose: {
     position: "absolute",
     top: 10,

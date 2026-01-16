@@ -26,10 +26,11 @@ import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
 import SellerCheckoutPage from "./pages/SellerCheckoutPage";
 import { PublishStartPage } from "./pages/publicar/PublishStartPage";
-import VerifyOtpRoutePage from "./pages/publicar/VerifyOtpRoutePage";
+import  VerifyOtpRoutePage  from "./pages/publicar/VerifyOtpRoutePage";
 import ProductFormPage from "./pages/publicar/ProductFormPage";
 import PaymentPage from "./pages/publicar/PaymentPage";
 import PublishSuccessPage  from "./pages/publicar/PublishSuccessPage";
+import MyProductsPage from "./pages/publicar/MyProductsPage";
 
 
 // Públicas
@@ -42,6 +43,7 @@ import SellerProductsPage from "./pages/seller/SellerProductsPage";
 import SellerStatsPage from "./pages/seller/SellerStatsPage";
 import SellerSettingsPage from "./pages/seller/SellerSettingsPage";
 import SellerOrdersPage from "./pages/seller/SellerOrdersPage";
+
 
 type AuthState = {
   token: string;
@@ -153,6 +155,7 @@ function App() {
         <Route path="/publicar/producto" element={<ProductFormPage />} />
         <Route path="/publicar/pago" element={<PaymentPage />} />
         <Route path="/publicar/listo" element={<PublishSuccessPage />} />
+        <Route path="/publicar/mis-productos" element={<MyProductsPage />} />
 
         {/* 🔑 Login */}
         <Route
@@ -183,6 +186,7 @@ function App() {
           <Route path="/admin/seller/stats" element={<SellerStatsPage />} />
           <Route path="/admin/seller/settings" element={<SellerSettingsPage />} />
           <Route path="/admin/seller/checkout" element={<SellerCheckoutPage />} />
+          
 
           {/* Admin puede abrir catálogos también */}
           <Route path="/admin/catalog/:slug" element={<PublicCatalogPage />} />
