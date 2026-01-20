@@ -20,7 +20,6 @@ import { AdminLayout } from "./AdminLayout";
 
 // Páginas del admin
 import ColoniesPage from "./pages/ColoniesPage";
-import ClustersPage from "./pages/ClustersPage";
 import ColoniesSelectorPage from "./pages/ColoniesSelectorPage";
 import NeighborSignupPage from "./pages/NeighborSignupPage";
 import UsersPage from "./pages/UsersPage";
@@ -44,7 +43,7 @@ import SellerProductsPage from "./pages/seller/SellerProductsPage";
 import SellerStatsPage from "./pages/seller/SellerStatsPage";
 import SellerSettingsPage from "./pages/seller/SellerSettingsPage";
 import SellerOrdersPage from "./pages/seller/SellerOrdersPage";
-
+import Dashboard from "./pages/Dashboard";
 
 type AuthState = {
   token: string;
@@ -173,10 +172,9 @@ function App() {
 
         {/* 🔒 Rutas protegidas */}
         <Route element={<AdminShell auth={auth} onLogout={handleLogout} />}>
-          <Route path="/admin/dashboard" element={<div>Dashboard</div>} />
+          <Route path="/admin/dashboard"  element={<Dashboard />} />
 
           {/* Admin */}
-          <Route path="/admin/clusters" element={<ClustersPage />} />
           <Route path="/admin/colonies" element={<ColoniesSelectorPage />} />
           <Route path="/admin/colonies/:clusterId" element={<ColoniesPage />} />
           <Route path="/admin/signup" element={<NeighborSignupPage />} />

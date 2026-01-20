@@ -84,6 +84,7 @@ export default function ProductFormPage() {
 
   const [featured, setFeatured] = useState(false); // ✅ NUEVO
   const [quantity, setQuantity] = useState("1");   // ✅ NUEVO (string para input)
+  const [catalogSlug, setCatalogSlug] = useState<string | null>(null);
 
   // ✅ cleanup: revoke de todas las previews al desmontar
   useEffect(() => {
@@ -138,6 +139,37 @@ export default function ProductFormPage() {
   useEffect(() => {
     if (loading) return;
     if (!ok) return;
+
+    let alive = true;
+
+    (async () => {
+      try {
+        const catalog = await getMyPublisherCatalog().catch(() => null);
+        if (!catalog) return;
+
+        const c: any = catalog;
+        const slug =
+          c?.catalogSlug ??
+          c?.publicSlug ??
+          c?.slug ??
+          null;
+
+        if (!slug) return;
+
+        if (alive) setCatalogSlug(slug);
+      } catch (e) {
+        console.log("Error resolviendo catálogo", e);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [loading, ok]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!ok) return;
     loadCredits();
   }, [loading, ok, loadCredits]);
 
@@ -145,65 +177,65 @@ export default function ProductFormPage() {
     fileInputRef.current?.click();
   }
 
-function validateFile(file: File): string | null {
-  if (!isImageFile(file)) return "Selecciona imágenes JPG/PNG.";
-  // solo bloquea si es EXAGERADO (por ejemplo 50MB)
-  if (file.size > 50 * 1024 * 1024) return "La imagen es demasiado pesada (máx 50MB).";
-  return null;
-}
-
-async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-  setImgErr(null);
-
-  const fileList = e.target.files;
-  if (!fileList || fileList.length === 0) return;
-
-  const remaining = MAX_IMAGES - images.length;
-  if (remaining <= 0) {
-    setImgErr(`Máximo ${MAX_IMAGES} imágenes.`);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    return;
+  function validateFile(file: File): string | null {
+    if (!isImageFile(file)) return "Selecciona imágenes JPG/PNG.";
+    // solo bloquea si es EXAGERADO (por ejemplo 50MB)
+    if (file.size > 50 * 1024 * 1024) return "La imagen es demasiado pesada (máx 50MB).";
+    return null;
   }
 
-  const picked = Array.from(fileList).slice(0, remaining);
+  async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setImgErr(null);
 
-  // ✅ comprimimos y luego agregamos
-  const next: DraftImage[] = [];
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
-  for (const f of picked) {
-    const err = validateFile(f);
-    if (err) {
-      setImgErr(err);
-      continue;
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      setImgErr(`Máximo ${MAX_IMAGES} imágenes.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
     }
 
-    try {
-      const c = await compressImageFile(f, {
-        maxSide: 1600,
-        quality: 0.82,
-        mimeType: "image/jpeg", // o "image/jpeg"
-      });
+    const picked = Array.from(fileList).slice(0, remaining);
 
-      next.push({ file: c.file, previewUrl: c.previewUrl });
-    } catch {
-      // fallback: si algo falla, usamos el original
-      next.push({ file: f, previewUrl: URL.createObjectURL(f) });
+    // ✅ comprimimos y luego agregamos
+    const next: DraftImage[] = [];
+
+    for (const f of picked) {
+      const err = validateFile(f);
+      if (err) {
+        setImgErr(err);
+        continue;
+      }
+
+      try {
+        const c = await compressImageFile(f, {
+          maxSide: 1600,
+          quality: 0.82,
+          mimeType: "image/jpeg", // o "image/jpeg"
+        });
+
+        next.push({ file: c.file, previewUrl: c.previewUrl });
+      } catch {
+        // fallback: si algo falla, usamos el original
+        next.push({ file: f, previewUrl: URL.createObjectURL(f) });
+      }
     }
-  }
 
-  if (next.length === 0) {
+    if (next.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setImages((prev) => {
+      const merged = [...prev, ...next];
+      if (merged.length > 0 && prev.length === 0) setActiveIndex(0);
+      return merged;
+    });
+
     if (fileInputRef.current) fileInputRef.current.value = "";
-    return;
   }
-
-  setImages((prev) => {
-    const merged = [...prev, ...next];
-    if (merged.length > 0 && prev.length === 0) setActiveIndex(0);
-    return merged;
-  });
-
-  if (fileInputRef.current) fileInputRef.current.value = "";
-}
 
   function removeImageAt(idx: number) {
     setImages((prev) => {
@@ -276,12 +308,12 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
         loadCredits();
 
         // ir a success
-        const slug = `mi-catalogo-${draft.phoneLocal.slice(-4)}`;
+
         navigate("/publicar/listo", {
           replace: true,
           state: {
             productId,
-            catalogUrl: `https://lokaly.site/catalog/${slug}`,
+            catalogUrl: `https://lokaly.site/catalog/${catalogSlug}`,
             plan: "CREDITS",
             amountPaid: 0,
             title: draft.title,
@@ -323,8 +355,8 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     ? creditsLoading
       ? "Revisando créditos…"
       : creditsLeft > 0
-      ? `Tienes ${creditsLeft} publicación(es) disponible(s)`
-      : ""
+        ? `Tienes ${creditsLeft} publicación(es) disponible(s)`
+        : ""
     : "Elige un paquete para activar tu publicación";
 
   return (
@@ -358,38 +390,41 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
           <div className="lp__detailLeft">
             <div className="lp__detailKicker">Publica tu producto</div>
             <div className="lp__detailTitle">Crea tu publicación</div>
-<div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-  <button
-    type="button"
-    onClick={() => navigate("/publicar/mis-productos")}
-    style={{
-      border: "1px solid rgba(15,23,42,0.14)",
-      background: "rgba(255,255,255,0.95)",
-      borderRadius: 999,
-      padding: "10px 14px",
-      fontWeight: 950,
-      cursor: "pointer",
-      boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
-    }}
-  >
-    📦 Administrar mis productos
-  </button>
+            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => navigate("/publicar/mis-productos")}
+                style={{
+                  border: "1px solid rgba(15,23,42,0.14)",
+                  background: "rgba(255,255,255,0.95)",
+                  borderRadius: 999,
+                  padding: "10px 14px",
+                  fontWeight: 950,
+                  cursor: "pointer",
+                  boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
+                }}
+              >
+                📦 Administrar mis productos
+              </button>
 
-  <button
-    type="button"
-    onClick={() => window.open(`https://lokaly.site/catalog/${/* slug si lo tienes */""}`, "_blank")}
-    style={{
-      border: "1px solid rgba(15,23,42,0.14)",
-      background: "rgba(15,23,42,0.04)",
-      borderRadius: 999,
-      padding: "10px 14px",
-      fontWeight: 950,
-      cursor: "pointer",
-    }}
-  >
-    🔗 Ver mi catálogo
-  </button>
-</div>            
+
+              {catalogSlug && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`https://lokaly.site/catalog/${catalogSlug}`, "_blank")}
+                  style={{
+                    border: "1px solid rgba(15,23,42,0.14)",
+                    background: "rgba(15,23,42,0.04)",
+                    borderRadius: 999,
+                    padding: "10px 14px",
+                    fontWeight: 950,
+                    cursor: "pointer",
+                  }}
+                >
+                  🔗 Ver mi catálogo
+                </button>
+              )}
+            </div>
             <div className="lp__detailText">
               🕒 Tu publicación estará activa <strong>30 días</strong>. Podrás editarla después.
             </div>
@@ -661,7 +696,7 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
                 ) : null}
               </div>
 
-                            {/* Cantidad disponible */}
+              {/* Cantidad disponible */}
               <div style={{ marginBottom: 12 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 900, color: "rgba(15,23,42,0.75)", marginBottom: 8 }}>
                   Cantidad disponible
@@ -745,65 +780,65 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
                 )}
               </div>
 
-{/* Destacado */}
-<div style={{ marginBottom: 14 }}>
-  <button
-    type="button"
-    onClick={() => setFeatured((v) => !v)}
-    disabled={submitting}
-    style={{
-      width: "100%",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      padding: "12px 14px",
-      borderRadius: 14,
-      border: "1px solid rgba(15,23,42,0.14)",
-      background: "rgba(255,255,255,0.95)",
-      cursor: "pointer",
-      fontWeight: 900,
-      color: "rgba(15,23,42,0.78)",
-      opacity: submitting ? 0.7 : 1,
-      textAlign: "left",
-    }}
-  >
-    <span>⭐ Marcar como destacado</span>
+              {/* Destacado */}
+              <div style={{ marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => setFeatured((v) => !v)}
+                  disabled={submitting}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "12px 14px",
+                    borderRadius: 14,
+                    border: "1px solid rgba(15,23,42,0.14)",
+                    background: "rgba(255,255,255,0.95)",
+                    cursor: "pointer",
+                    fontWeight: 900,
+                    color: "rgba(15,23,42,0.78)",
+                    opacity: submitting ? 0.7 : 1,
+                    textAlign: "left",
+                  }}
+                >
+                  <span>⭐ Marcar como destacado</span>
 
-    {/* switch */}
-    <span
-      aria-hidden
-      style={{
-        width: 44,
-        height: 26,
-        borderRadius: 999,
-        background: featured ? "rgba(34,197,94,0.25)" : "rgba(15,23,42,0.12)",
-        border: featured ? "1px solid rgba(34,197,94,0.40)" : "1px solid rgba(15,23,42,0.18)",
-        position: "relative",
-        flex: "0 0 auto",
-      }}
-    >
-      <span
-        style={{
-          position: "absolute",
-          top: 3,
-          left: featured ? 22 : 3,
-          width: 20,
-          height: 20,
-          borderRadius: 999,
-          background: featured ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.95)",
-          border: "1px solid rgba(15,23,42,0.18)",
-          boxShadow: "0 8px 16px rgba(0,0,0,0.10)",
-          transition: "left 160ms ease",
-        }}
-      />
-    </span>
-  </button>
+                  {/* switch */}
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 44,
+                      height: 26,
+                      borderRadius: 999,
+                      background: featured ? "rgba(34,197,94,0.25)" : "rgba(15,23,42,0.12)",
+                      border: featured ? "1px solid rgba(34,197,94,0.40)" : "1px solid rgba(15,23,42,0.18)",
+                      position: "relative",
+                      flex: "0 0 auto",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 3,
+                        left: featured ? 22 : 3,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 999,
+                        background: featured ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.95)",
+                        border: "1px solid rgba(15,23,42,0.18)",
+                        boxShadow: "0 8px 16px rgba(0,0,0,0.10)",
+                        transition: "left 160ms ease",
+                      }}
+                    />
+                  </span>
+                </button>
 
-  <div style={{ marginTop: 6, fontSize: 12, color: "rgba(15,23,42,0.55)", fontWeight: 700 }}>
-    Aparecerá primero en tu catálogo.
-  </div>
-</div>
+                <div style={{ marginTop: 6, fontSize: 12, color: "rgba(15,23,42,0.55)", fontWeight: 700 }}>
+                  Aparecerá primero en tu catálogo.
+                </div>
+              </div>
 
               {/* Descripción */}
               <div style={{ marginBottom: 12 }}>

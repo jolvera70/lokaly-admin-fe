@@ -1,50 +1,119 @@
 // src/pages/Dashboard.tsx
-import React, { useEffect, useState } from "react";
-import { fetchAdminStats, type AdminStats } from "../api";
+import React, { useCallback, useMemo, useState } from "react";
+
+type CatalogStatsResponse = {
+  catalogViews: number;
+  uniqueVisitors: number;
+  productViews: number;
+  productClicks: number;
+  whatsappClicks: number;
+  orderIntent: number;
+  orderSubmitOk: number;
+  // si luego agregas más en BE, se extiende aquí
+};
+
+function pct(n: number, d: number) {
+  if (!d || d <= 0) return 0;
+  return Math.round((n / Math.max(1, d)) * 100);
+}
+
+function KpiCard({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 14,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background:
+          "radial-gradient(circle at top left, rgba(255,255,255,0.08), rgba(0,0,0,0.9))",
+      }}
+    >
+      <div style={{ fontSize: 11, color: "#a3a3a3", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: "#f2d58b" }}>{value}</div>
+      {sub ? <div style={{ marginTop: 6, fontSize: 11, color: "#8a8a8a" }}>{sub}</div> : null}
+    </div>
+  );
+}
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 14,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(8,8,8,0.95)",
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 650, color: "#f5f5f5", marginBottom: 10 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [catalogId, setCatalogId] = useState("");
+  const [days, setDays] = useState(7);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const data = await fetchAdminStats();
-        setStats(data);
-      } catch (e: any) {
-        setError(e.message || "Error al cargar estadísticas");
-      } finally {
-        setLoading(false);
+  const [stats, setStats] = useState<CatalogStatsResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const id = catalogId.trim();
+    if (!id) {
+      setErr("Escribe un catalogId para consultar estadísticas.");
+      setStats(null);
+      return;
+    }
+
+    setErr(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`/api/public/v1/stats/catalog/${encodeURIComponent(id)}/summary?days=${days}`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const msg =
+          res.status === 401
+            ? "Tu sesión expiró."
+            : res.status === 404
+            ? "No se encontró ese catálogo."
+            : "No se pudieron cargar estadísticas.";
+        throw new Error(msg);
       }
-    })();
-  }, []);
+
+      const j = (await res.json()) as CatalogStatsResponse;
+      setStats(j);
+    } catch (e: any) {
+      setErr(e?.message || "No se pudieron cargar estadísticas.");
+      setStats(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [catalogId, days]);
+
+  const funnel = useMemo(() => {
+    if (!stats) return null;
+    const c2p = pct(stats.productClicks, stats.catalogViews);
+    const p2i = pct(stats.orderIntent, stats.productViews);
+    const i2o = pct(stats.orderSubmitOk, stats.orderIntent);
+    const c2o = pct(stats.orderSubmitOk, stats.catalogViews);
+    return { c2p, p2i, i2o, c2o };
+  }, [stats]);
 
   return (
     <div>
-      <section
-        style={{
-          marginBottom: 12,
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 20,
-            fontWeight: 500,
-          }}
-        >
-          Dashboard
+      <section style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 650, color: "#f5f5f5" }}>
+          Dashboard · Uso (Tracción)
         </h2>
-        <p
-          style={{
-            margin: "4px 0 0",
-            fontSize: 13,
-            color: "#9b9b9b",
-          }}
-        >
-          Resumen general de Lokaly: usuarios, vendedores, ventas y actividad.
+        <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9b9b9b" }}>
+          Embudo comprador (por catálogo) usando track_events.
         </p>
       </section>
 
@@ -56,206 +125,104 @@ export default function Dashboard() {
           padding: 18,
           display: "flex",
           flexDirection: "column",
-          gap: 18,
+          gap: 14,
         }}
       >
-        {loading ? (
-          <p style={{ fontSize: 13, color: "#e3e3e3" }}>
-            Cargando estadísticas...
-          </p>
-        ) : error ? (
-          <p style={{ fontSize: 13, color: "#ff6b6b" }}>{error}</p>
-        ) : !stats ? (
-          <p style={{ fontSize: 13, color: "#e3e3e3" }}>
-            No hay estadísticas disponibles todavía.
-          </p>
+        {/* Controles */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            value={catalogId}
+            onChange={(e) => setCatalogId(e.target.value)}
+            placeholder="catalogId (ej: mi-catalogo-ed8x5qf o ObjectId)"
+            style={{
+              flex: 1,
+              minWidth: 260,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.10)",
+              background: "rgba(0,0,0,0.6)",
+              color: "#fff",
+              outline: "none",
+            }}
+          />
+
+          <select
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.10)",
+              background: "rgba(0,0,0,0.6)",
+              color: "#fff",
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value={1}>Hoy</option>
+            <option value={7}>7 días</option>
+            <option value={14}>14 días</option>
+            <option value={30}>30 días</option>
+          </select>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid rgba(242,213,139,0.35)",
+              background: loading ? "rgba(255,255,255,0.08)" : "rgba(242,213,139,0.12)",
+              color: "#f2d58b",
+              fontWeight: 750,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            {loading ? "Cargando..." : "Consultar"}
+          </button>
+        </div>
+
+        {err ? (
+          <div style={{ fontSize: 13, color: "#ff6b6b", fontWeight: 650 }}>{err}</div>
+        ) : null}
+
+        {!stats ? (
+          <div style={{ fontSize: 13, color: "#bdbdbd" }}>
+            Ingresa un <b>catalogId</b> y presiona <b>Consultar</b>.
+          </div>
         ) : (
           <>
-            {/* KPIs principales */}
+            {/* KPIs */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
                 gap: 14,
               }}
             >
-              <KpiCard
-                label="Usuarios totales"
-                value={stats.totalUsers.toString()}
-              />
-              <KpiCard
-                label="Vendedores activos"
-                value={stats.totalSellers.toString()}
-              />
-              <KpiCard
-                label="Productos publicados"
-                value={stats.totalProducts.toString()}
-              />
-              <KpiCard
-                label="Ventas totales"
-                value={stats.totalSales.toString()}
-              />
+              <KpiCard label="👥 Visitantes únicos" value={stats.uniqueVisitors ?? 0} sub={`${days} días`} />
+              <KpiCard label="📖 Vistas de catálogo" value={stats.catalogViews ?? 0} sub={`${days} días`} />
+              <KpiCard label="🖱️ Clicks a producto" value={stats.productClicks ?? 0} sub={`${days} días`} />
+              <KpiCard label="🧾 Pedidos enviados (OK)" value={stats.orderSubmitOk ?? 0} sub={`${days} días`} />
             </div>
 
-            {/* Actividad y engagement */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 14,
-              }}
-            >
-              <Card
-                title="Actividad reciente"
-                description="Cómo se ha movido la plataforma en los últimos 7 días."
-              >
-                <SmallStat
-                  label="Nuevos usuarios (7 días)"
-                  value={stats.newUsersLast7Days.toString()}
-                />
-                <SmallStat
-                  label="Vendedores activos (7 días)"
-                  value={stats.activeSellersLast7Days.toString()}
-                />
-              </Card>
+            {/* Embudo comprador */}
+            <Panel title="Embudo comprador">
+              <div style={{ display: "grid", gap: 8, fontSize: 13, color: "#e3e3e3" }}>
+                <div>1) Vistas catálogo: <b style={{ color: "#f2d58b" }}>{stats.catalogViews ?? 0}</b></div>
+                <div>2) Click producto: <b style={{ color: "#f2d58b" }}>{stats.productClicks ?? 0}</b> ({funnel?.c2p ?? 0}%)</div>
+                <div>3) Intento compra (form): <b style={{ color: "#f2d58b" }}>{stats.orderIntent ?? 0}</b> (Producto→Intento {funnel?.p2i ?? 0}%)</div>
+                <div>4) Pedido enviado OK: <b style={{ color: "#f2d58b" }}>{stats.orderSubmitOk ?? 0}</b> (Intento→OK {funnel?.i2o ?? 0}%)</div>
+                <div>5) Click WhatsApp: <b style={{ color: "#f2d58b" }}>{stats.whatsappClicks ?? 0}</b></div>
 
-              <Card
-                title="Engagement con catálogos"
-                description="Visitas a productos y catálogos públicos."
-              >
-                <SmallStat
-                  label="Vistas de productos"
-                  value={stats.totalProductViews.toString()}
-                />
-                <SmallStat
-                  label="Vistas de catálogos"
-                  value={stats.totalCatalogViews.toString()}
-                />
-              </Card>
-            </div>
-
-            <p
-              style={{
-                margin: "4px 0 0",
-                fontSize: 11,
-                color: "#7a7a7a",
-              }}
-            >
-              Tip: usa estos datos para entender qué tan rápido está creciendo
-              Lokaly y qué tanto están usando los catálogos los vendedores.
-            </p>
+                <div style={{ marginTop: 8, fontSize: 12, color: "#9b9b9b" }}>
+                  Conversión total (Catálogo→Pedido OK): <b style={{ color: "#f2d58b" }}>{funnel?.c2o ?? 0}%</b>
+                </div>
+              </div>
+            </Panel>
           </>
         )}
       </section>
     </div>
   );
 }
-
-const KpiCard: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div
-    style={{
-      padding: 14,
-      borderRadius: 14,
-      border: "1px solid rgba(255,255,255,0.08)",
-      background:
-        "radial-gradient(circle at top left, rgba(255,255,255,0.08), rgba(0,0,0,0.9))",
-    }}
-  >
-    <div
-      style={{
-        fontSize: 11,
-        color: "#a3a3a3",
-        marginBottom: 4,
-      }}
-    >
-      {label}
-    </div>
-    <div
-      style={{
-        fontSize: 22,
-        fontWeight: 600,
-        color: "#f2d58b",
-      }}
-    >
-      {value}
-    </div>
-  </div>
-);
-
-const Card: React.FC<{
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}> = ({ title, description, children }) => (
-  <div
-    style={{
-      padding: 14,
-      borderRadius: 14,
-      border: "1px solid rgba(255,255,255,0.08)",
-      background: "rgba(8,8,8,0.95)",
-      display: "flex",
-      flexDirection: "column",
-      gap: 8,
-    }}
-  >
-    <div>
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 500,
-          color: "#f5f5f5",
-        }}
-      >
-        {title}
-      </div>
-      {description && (
-        <div
-          style={{
-            fontSize: 12,
-            color: "#9b9b9b",
-          }}
-        >
-          {description}
-        </div>
-      )}
-    </div>
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-      }}
-    >
-      {children}
-    </div>
-  </div>
-);
-
-const SmallStat: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      fontSize: 12,
-      color: "#e3e3e3",
-    }}
-  >
-    <span>{label}</span>
-    <span
-      style={{
-        fontWeight: 600,
-        color: "#f2d58b",
-      }}
-    >
-      {value}
-    </span>
-  </div>
-);

@@ -47,6 +47,32 @@ type OrderRequestPayload = {
 // =======================
 
 const ANALYTICS_BASE = `${PUBLIC_BASE_URL}/v1/analytics`;
+const REPORTS_BASE = `${PUBLIC_BASE_URL}/v1/reports`;
+
+async function submitReport(payload: {
+  targetType: "PRODUCT";
+  productId: string;
+  catalogSlug?: string | null;
+  path?: string;
+  reason: string;
+  details?: string | null;
+  visitorId?: string;
+}) {
+  const res = await fetch(`${REPORTS_BASE}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let msg = "No se pudo enviar el reporte.";
+    try {
+      const j = await res.json();
+      msg = j?.message || j?.error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+}
 
 function getVisitorId(): string {
   try {
@@ -573,6 +599,259 @@ function OrderSheet({
   );
 }
 
+
+type ReportReason =
+  | "ILLEGAL_ITEM"
+  | "ABUSE_OR_EXPLOITATION"
+  | "NON_CONSENSUAL_INTIMATE"
+  | "HATE_OR_HARASSMENT"
+  | "SCAM_OR_FRAUD"
+  | "OTHER";
+
+const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: "ILLEGAL_ITEM", label: "🚫 Producto ilegal o prohibido" },
+  { value: "ABUSE_OR_EXPLOITATION", label: "🛑 Abuso / explotación" },
+  { value: "NON_CONSENSUAL_INTIMATE", label: "⚠️ Contenido íntimo no consensuado" },
+  { value: "HATE_OR_HARASSMENT", label: "😠 Odio / acoso" },
+  { value: "SCAM_OR_FRAUD", label: "🎭 Estafa / fraude" },
+  { value: "OTHER", label: "❓ Otro" },
+];
+
+function ReportModal({
+  open,
+  onClose,
+  productId,
+  catalogSlug,
+}: {
+  open: boolean;
+  onClose: () => void;
+  productId: string;
+  catalogSlug?: string | null;
+}) {
+  const [reason, setReason] = useState<ReportReason>("ILLEGAL_ITEM");
+  const [details, setDetails] = useState("");
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const left = 500 - details.length;
+
+  return (
+    <div style={sr.backdrop} onClick={onClose}>
+      <div style={sr.card} onClick={(e) => e.stopPropagation()}>
+        <div style={sr.topRow}>
+          <div style={sr.title}>🚩 Reportar publicación</div>
+          <button style={sr.closeBtn} onClick={onClose} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+
+        {!done ? (
+          <>
+            <div style={sr.help}>
+              Usa esta opción si el producto tiene imágenes ilegales, abuso o contenido no permitido.
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <div style={sr.label}>Motivo</div>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value as ReportReason)}
+                style={sr.select}
+                disabled={sending}
+              >
+                {REPORT_REASONS.map((r) => (
+                  <option key={r.value} value={r.value} style={{ color: "#111827", background: "#fff" }}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <div style={sr.label}>
+                Comentario (opcional){" "}
+                <span style={{ opacity: 0.55, fontWeight: 900 }}>{left}</span>
+              </div>
+              <textarea
+                value={details}
+                onChange={(e) => {
+                  const v = e.target.value || "";
+                  setDetails(v.length > 500 ? v.slice(0, 500) : v);
+                }}
+                style={sr.textarea}
+                placeholder="Describe brevemente qué ocurre…"
+                disabled={sending}
+              />
+            </div>
+
+            <div style={sr.actions}>
+              <button onClick={onClose} style={sr.btnGhost} disabled={sending}>
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setSending(true);
+
+                    await submitReport({
+                      targetType: "PRODUCT",
+                      productId,
+                      catalogSlug: catalogSlug ?? null,
+                      path: window.location.pathname,
+                      reason,
+                      details: details.trim() ? details.trim() : null,
+                      visitorId: getVisitorId(),
+                    });
+
+                    // opcional: track event de reporte (si quieres)
+                    try {
+                      trackEvent({
+                        name: "REPORT_SUBMIT_OK",
+                        domain: "report",
+                        visitorId: getVisitorId(),
+                        catalogId: catalogSlug ?? "unknown",
+                        productId,
+                        path: window.location.pathname,
+                        props: { reason },
+                      });
+                    } catch {}
+
+                    setDone(true);
+                    toast("Reporte enviado ✅");
+                  } catch (e: any) {
+                    alert(e?.message || "No se pudo enviar el reporte.");
+                  } finally {
+                    setSending(false);
+                  }
+                }}
+                style={sr.btnPrimary}
+                disabled={sending}
+              >
+                {sending ? "Enviando…" : "Enviar reporte"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={sr.okBox}>
+              <div style={{ fontWeight: 1000, fontSize: 16 }}>✅ Gracias</div>
+              <div style={{ marginTop: 6, color: "#6B7280", fontSize: 13, lineHeight: 1.45 }}>
+                Revisaremos este reporte lo antes posible.
+              </div>
+            </div>
+
+            <div style={sr.actions}>
+              <button onClick={onClose} style={sr.btnPrimary}>
+                Cerrar
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const sr: Record<string, React.CSSProperties> = {
+  backdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9999,
+    background: "rgba(15,23,42,0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+  },
+  card: {
+    width: "min(560px, 100%)",
+    background: "#fff",
+    borderRadius: 18,
+    border: "1px solid #E5E7EB",
+    boxShadow: "0 24px 90px rgba(0,0,0,0.25)",
+    padding: 14,
+    color: "#111827", // ✅ fuerza texto modal
+  },
+  topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  title: { fontWeight: 1000, fontSize: 16, color: "#111827" },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+    color: "#111827",
+  },
+  help: { marginTop: 8, fontSize: 12.5, fontWeight: 800, color: "rgba(15,23,42,0.65)", lineHeight: 1.4 },
+  label: { fontSize: 12, fontWeight: 900, color: "#111827" },
+
+  select: {
+    marginTop: 6,
+    width: "100%",
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    padding: "12px 12px",
+    fontWeight: 900,
+    outline: "none",
+    background: "#fff",
+    color: "#111827",     // ✅
+    appearance: "auto",   // ✅
+  },
+
+  textarea: {
+    marginTop: 6,
+    width: "100%",
+    minHeight: 98,
+    borderRadius: 12,
+    border: "1px solid #E5E7EB",
+    padding: "12px 12px",
+    fontSize: 13,
+    fontWeight: 750,
+    outline: "none",
+    resize: "vertical",
+    background: "#fff",
+    color: "#111827",     // ✅
+  },
+
+  actions: { marginTop: 12, display: "flex", gap: 10, justifyContent: "flex-end" },
+  btnGhost: {
+    height: 44,
+    padding: "0 14px",
+    borderRadius: 999,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+    color: "#111827",
+  },
+  btnPrimary: {
+    height: 44,
+    padding: "0 14px",
+    borderRadius: 999,
+    border: "none",
+    background: "#111827",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 1000,
+  },
+  okBox: { marginTop: 12, padding: 12, borderRadius: 14, border: "1px solid #E5E7EB", background: "#F9FAFB" },
+};
 /* =======================
    Page
 ======================= */
@@ -596,6 +875,7 @@ export function PublicProductPage() {
   const [orderOk, setOrderOk] = useState<{ id?: string } | null>(null);
 
   const productUrl = useMemo(() => window.location.href, []);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // remember buyer info (pro UX)
   useEffect(() => {
@@ -1023,6 +1303,37 @@ function openOrderModal() {
               <p style={s.descMuted}>Este producto no tiene descripción.</p>
             )}
 
+<div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+  <button
+    onClick={() => {
+      // opcional: track "REPORT_OPEN"
+      try {
+        trackEvent({
+          name: "REPORT_OPEN",
+          domain: "report",
+          visitorId: getVisitorId(),
+          catalogId: data?.seller?.slug || data?.seller?.id || "unknown",
+          productId: data?.id,
+          path: window.location.pathname,
+        });
+      } catch {}
+      setReportOpen(true);
+    }}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 999,
+      border: "1px solid #E5E7EB",
+      background: "#fff",
+      cursor: "pointer",
+      fontWeight: 900,
+      fontSize: 12,
+      color: "#111827",
+    }}
+  >
+    🚩 Reportar
+  </button>
+</div>
+
             {/* Sticky CTA */}
             <div style={s.sellerCTA}>
               <button onClick={copyLink} style={s.bottomGhost}>
@@ -1137,6 +1448,13 @@ function openOrderModal() {
     openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
   }}
       />
+
+<ReportModal
+  open={reportOpen}
+  onClose={() => setReportOpen(false)}
+  productId={data.id}
+  catalogSlug={data.seller.slug || null}
+/>      
     </div>
   );
 }

@@ -824,6 +824,32 @@ export async function rejectCatalogOrder(orderId: string): Promise<void> {
   void orderId;
   return;
 }
+export type CatalogStatsSummary = {
+  catalogViews: number;
+  uniqueVisitors: number;
+  productViews: number;
+  productClicks: number;
+  whatsappClicks: number;
+  orderIntent: number;
+  orderSubmitOk: number;
+};
 
-// Ojo: ya existe markOrderDelivered(orderId) en tu api.ts
-// No creamos markCatalogOrderDelivered para evitar duplicidad.
+export async function fetchCatalogStatsSummary(
+  catalogId: string,
+  days: number
+): Promise<CatalogStatsSummary> {
+  const res = await fetch(
+    `/api/public/v1/stats/catalog/${encodeURIComponent(catalogId)}/summary?days=${days}`,
+    { credentials: "include" }
+  );
+
+  if (!res.ok) {
+    const msg =
+      res.status === 401
+        ? "Sesión expirada. Vuelve a iniciar sesión."
+        : "No se pudieron cargar las estadísticas.";
+    throw new Error(msg);
+  }
+
+  return (await res.json()) as CatalogStatsSummary;
+}

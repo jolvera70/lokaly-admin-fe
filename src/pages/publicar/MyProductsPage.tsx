@@ -13,6 +13,26 @@ import {
   getMyPublisherCatalog,
 } from "../../api";
 
+const TOS_VERSION = "2026-01-20";
+
+async function getSellerConsent(): Promise<{ accepted: boolean; version?: string | null }> {
+  const res = await fetch("/api/public/v1/legal/seller/consent", { credentials: "include" });
+  if (!res.ok) {
+    // si falla, por seguridad NO bloquees (o sí, según tu preferencia)
+    return { accepted: true };
+  }
+  return (await res.json()) as any;
+}
+
+async function acceptSellerConsent(): Promise<void> {
+  const res = await fetch("/api/public/v1/legal/seller/consent", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: TOS_VERSION }),
+  });
+  if (!res.ok) throw new Error("No se pudo guardar tu aceptación.");
+}
 /* ================== TIPOS ================== */
 
 type StatsSummary = {
@@ -329,11 +349,17 @@ export default function MyProductsPage() {
   const [ordersErr, setOrdersErr] = useState<string | null>(null);
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
 
+  const [tosAccepted, setTosAccepted] = useState<boolean>(true);
+  const [tosLoading, setTosLoading] = useState<boolean>(true);
+  const [tosOpen, setTosOpen] = useState<boolean>(false);
+  const [tosChecked, setTosChecked] = useState<boolean>(false);
+  const [tosBusy, setTosBusy] = useState<boolean>(false);
+  const [tosErr, setTosErr] = useState<string | null>(null);
 
   // Si luego quieres cargar slug real, aquí
   const catalogSlug: string | null = null;
 
-    // ===== stats =====
+  // ===== stats =====
   const [catalogId, setCatalogId] = useState<string | null>(null);
   const [statsDays, setStatsDays] = useState<number>(7);
   const [stats, setStats] = useState<StatsSummary | null>(null);
@@ -342,7 +368,7 @@ export default function MyProductsPage() {
 
   const alerts = useMemo(() => buildActionableAlerts(stats, items), [stats, items]);
 
-    const loadStats = useCallback(async () => {
+  const loadStats = useCallback(async () => {
     if (!catalogId) return;
 
     setStatsErr(null);
@@ -371,6 +397,36 @@ export default function MyProductsPage() {
     }
   }, [catalogId, statsDays]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!ok) return;
+
+    (async () => {
+      setTosLoading(true);
+      try {
+        const s = await getSellerConsent();
+        const accepted = Boolean(s.accepted) && (s.version ? s.version === TOS_VERSION : true);
+        setTosAccepted(accepted);
+      } finally {
+        setTosLoading(false);
+      }
+    })();
+  }, [loading, ok]);
+
+  const goPublish = useCallback(async () => {
+    // si todavía no sabemos, espera (o permite)
+    if (tosLoading) return;
+
+    if (tosAccepted) {
+      navigate("/publicar/producto");
+      return;
+    }
+
+    setTosErr(null);
+    setTosChecked(false);
+    setTosOpen(true);
+  }, [tosAccepted, tosLoading, navigate]);
+
   /* ================== LOAD PRODUCTS ================== */
   const load = useCallback(async () => {
     setErr(null);
@@ -387,15 +443,16 @@ export default function MyProductsPage() {
         const total = Number((catalog as any).creditsTotal ?? 0);
         const used = Number((catalog as any).creditsUsed ?? 0);
         setCreditsLeft(Math.max(0, total - used));
-setCatalogId(
-  c.publicSlug ??
-  c.slug ??
-  c.catalogSlug ??
-  c.catalogPublicId ??
-  c.id ??
-  c._id ??
-  null
-);      } else {
+        setCatalogId(
+          c.publicSlug ??
+          c.slug ??
+          c.catalogSlug ??
+          c.catalogPublicId ??
+          c.id ??
+          c._id ??
+          null
+        );
+      } else {
         setCreditsLeft(null);
         setCatalogId(null);
       }
@@ -412,7 +469,7 @@ setCatalogId(
     }
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!ok) return;
     if (tab !== "stats") return;
     loadStats();
@@ -493,7 +550,7 @@ setCatalogId(
           try {
             const j = await res.json();
             msg = j?.message || j?.error || msg;
-          } catch {}
+          } catch { }
           throw new Error(msg);
         }
 
@@ -616,7 +673,7 @@ setCatalogId(
               Home
             </Link>
 
-            <button className="lp__navCta" onClick={() => navigate("/publicar/producto")}>
+            <button className="lp__navCta" onClick={goPublish}>
               Publicar
             </button>
           </nav>
@@ -669,11 +726,11 @@ setCatalogId(
               <button
                 type="button"
                 className="lp__btn lp__btn--primary"
-                onClick={() => navigate("/publicar/producto")}
-                disabled={creditsLoading}
+                onClick={goPublish}
+                disabled={creditsLoading || tosLoading}
                 style={{
-                  opacity: creditsLoading ? 0.7 : 1,
-                  cursor: creditsLoading ? "not-allowed" : "pointer",
+                  opacity: creditsLoading || tosLoading ? 0.7 : 1,
+                  cursor: creditsLoading || tosLoading ? "not-allowed" : "pointer",
                 }}
               >
                 + Publicar producto
@@ -752,6 +809,7 @@ setCatalogId(
                     <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
                       {items.map((p) => {
                         const paused = Boolean((p as any).paused);
+                        const reported = Boolean((p as any).reported);
                         const img = firstImage(p);
                         const busy = busyId === p.id;
 
@@ -783,6 +841,19 @@ setCatalogId(
                                     }}
                                   />
                                 ) : null}
+
+                                {reported ? (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      inset: 0,
+                                      background: "rgba(255,255,255,0.62)",
+                                      backdropFilter: "blur(2px)",
+                                      zIndex: 2,
+                                      pointerEvents: "none",
+                                    }}
+                                  />
+                                ) : null}
                               </div>
 
                               <div
@@ -810,16 +881,23 @@ setCatalogId(
                                   top: 10,
                                   padding: "6px 10px",
                                   borderRadius: 999,
-                                  background: paused
-                                    ? "rgba(245,158,11,0.16)"
-                                    : "rgba(34,197,94,0.14)",
+                                  background: reported
+                                    ? "rgba(220,38,38,0.12)"
+                                    : paused
+                                      ? "rgba(245,158,11,0.16)"
+                                      : "rgba(34,197,94,0.14)",
                                   border: "1px solid rgba(15,23,42,0.10)",
                                   fontWeight: 950,
                                   fontSize: 12,
-                                  color: paused ? "rgba(161,98,7,0.95)" : "rgba(21,128,61,0.95)",
+                                  color: reported
+                                    ? "rgba(127,29,29,0.95)"
+                                    : paused
+                                      ? "rgba(161,98,7,0.95)"
+                                      : "rgba(21,128,61,0.95)",
+                                  zIndex: 3,
                                 }}
                               >
-                                {paused ? "Pausado" : "Activo"}
+                                {reported ? "🚩 Reportado" : paused ? "Pausado" : "Activo"}
                               </div>
                             </div>
 
@@ -837,6 +915,27 @@ setCatalogId(
                               >
                                 {p.title}
                               </div>
+
+                              {reported ? (
+                                <div
+                                  style={{
+                                    marginTop: 6,
+                                    padding: "8px 10px",
+                                    borderRadius: 14,
+                                    border: "1px solid rgba(220,38,38,0.18)",
+                                    background: "rgba(220,38,38,0.06)",
+                                    fontSize: 12.5,
+                                    fontWeight: 850,
+                                    color: "rgba(127,29,29,0.92)",
+                                    lineHeight: 1.35,
+                                  }}
+                                >
+                                  Este producto está <b>oculto</b> del catálogo público mientras se revisa.
+                                  <div style={{ marginTop: 4, fontWeight: 800, color: "rgba(15,23,42,0.72)" }}>
+                                    👉 Edita la publicación o elimínala.
+                                  </div>
+                                </div>
+                              ) : null}
 
                               {p.description ? (
                                 <div
@@ -874,7 +973,7 @@ setCatalogId(
                                 <button
                                   type="button"
                                   onClick={() => onTogglePaused(p)}
-                                  disabled={busy}
+                                  disabled={busy || reported}
                                   className="lp__chipBtn"
                                   style={{
                                     background: paused ? "#0f172a" : "rgba(245,158,11,0.10)",
@@ -884,7 +983,7 @@ setCatalogId(
                                     cursor: busy ? "not-allowed" : "pointer",
                                   }}
                                 >
-                                  {paused ? "▶️ Reactivar" : "⏸️ Pausar"}
+                                  {reported ? "⛔ Bloqueado" : paused ? "▶️ Reactivar" : "⏸️ Pausar"}
                                 </button>
 
                                 <button
@@ -1086,10 +1185,10 @@ setCatalogId(
                                     o.status === "PENDING"
                                       ? "rgba(245,158,11,0.16)"
                                       : o.status === "ACCEPTED"
-                                      ? "rgba(34,197,94,0.14)"
-                                      : o.status === "DELIVERED"
-                                      ? "rgba(37,99,235,0.14)"
-                                      : "rgba(220,38,38,0.10)",
+                                        ? "rgba(34,197,94,0.14)"
+                                        : o.status === "DELIVERED"
+                                          ? "rgba(37,99,235,0.14)"
+                                          : "rgba(220,38,38,0.10)",
                                   border: "1px solid rgba(15,23,42,0.10)",
                                   fontWeight: 950,
                                   fontSize: 12,
@@ -1099,10 +1198,10 @@ setCatalogId(
                                 {o.status === "PENDING"
                                   ? "Pendiente"
                                   : o.status === "ACCEPTED"
-                                  ? "Aceptado"
-                                  : o.status === "DELIVERED"
-                                  ? "Entregado"
-                                  : "Rechazado"}
+                                    ? "Aceptado"
+                                    : o.status === "DELIVERED"
+                                      ? "Entregado"
+                                      : "Rechazado"}
                               </div>
                             </div>
 
@@ -1265,205 +1364,329 @@ setCatalogId(
             ) : null}
 
             {/* ===================== TAB: STATS ===================== */}
-{tab === "stats" ? (
-  <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
-    <AlertsPanel alerts={alerts} />
-    {/* selector y recargar */}
-    <div
-      style={{
-        padding: 12,
-        borderRadius: 16,
-        border: "1px solid rgba(15,23,42,0.10)",
-        background: "#fff",
-        boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
-        display: "flex",
-        gap: 10,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ fontWeight: 950, color: "rgba(15,23,42,0.85)" }}>Rango:</div>
+            {tab === "stats" ? (
+              <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+                <AlertsPanel alerts={alerts} />
+                {/* selector y recargar */}
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 16,
+                    border: "1px solid rgba(15,23,42,0.10)",
+                    background: "#fff",
+                    boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ fontWeight: 950, color: "rgba(15,23,42,0.85)" }}>Rango:</div>
 
-      <select
-        value={statsDays}
-        onChange={(e) => setStatsDays(Number(e.target.value))}
-        disabled={statsLoading}
-        style={{
-          border: "1px solid rgba(15,23,42,0.14)",
-          borderRadius: 12,
-          padding: "10px 12px",
-          fontWeight: 900,
-          outline: "none",
-          background: "rgba(255,255,255,0.98)",
-          cursor: "pointer",
-        }}
-      >
-        <option value={1}>Hoy</option>
-        <option value={7}>7 días</option>
-        <option value={30}>30 días</option>
-      </select>
+                  <select
+                    value={statsDays}
+                    onChange={(e) => setStatsDays(Number(e.target.value))}
+                    disabled={statsLoading}
+                    style={{
+                      border: "1px solid rgba(15,23,42,0.14)",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      fontWeight: 900,
+                      outline: "none",
+                      background: "rgba(255,255,255,0.98)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value={1}>Hoy</option>
+                    <option value={7}>7 días</option>
+                    <option value={30}>30 días</option>
+                  </select>
 
-      <button
-        type="button"
-        className="lp__btn lp__btn--ghost"
-        onClick={() => loadStats()}
-        disabled={statsLoading || !catalogId}
-      >
-        {statsLoading ? "Cargando..." : "Recargar"}
-      </button>
+                  <button
+                    type="button"
+                    className="lp__btn lp__btn--ghost"
+                    onClick={() => loadStats()}
+                    disabled={statsLoading || !catalogId}
+                  >
+                    {statsLoading ? "Cargando..." : "Recargar"}
+                  </button>
 
-      <div style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 850, color: "rgba(15,23,42,0.60)" }}>
-        {catalogId ? `Catálogo: ${String(catalogId).slice(0, 6)}…` : "Sin catálogo"}
-      </div>
-    </div>
+                  <div style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 850, color: "rgba(15,23,42,0.60)" }}>
+                    {catalogId ? `Catálogo: ${String(catalogId).slice(0, 6)}…` : "Sin catálogo"}
+                  </div>
+                </div>
 
-    {statsErr ? (
-      <div
-        style={{
-          marginTop: 0,
-          padding: "10px 12px",
-          borderRadius: 12,
-          background: "rgba(220,38,38,0.06)",
-          border: "1px solid rgba(220,38,38,0.18)",
-          color: "rgba(127,29,29,0.95)",
-          fontSize: 12.5,
-          fontWeight: 800,
-        }}
-        role="alert"
-      >
-        ⚠️ {statsErr}
-      </div>
-    ) : null}
+                {statsErr ? (
+                  <div
+                    style={{
+                      marginTop: 0,
+                      padding: "10px 12px",
+                      borderRadius: 12,
+                      background: "rgba(220,38,38,0.06)",
+                      border: "1px solid rgba(220,38,38,0.18)",
+                      color: "rgba(127,29,29,0.95)",
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                    }}
+                    role="alert"
+                  >
+                    ⚠️ {statsErr}
+                  </div>
+                ) : null}
 
-    {/* cards “operación diaria” */}
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-      <StatCard label="Vistas del catálogo" value={statsLoading ? "…" : (stats?.catalogViews ?? "—")} sub="Cuántas veces abrieron tu catálogo." />
-      <StatCard label="Visitantes únicos" value={statsLoading ? "…" : (stats?.uniqueVisitors ?? "—")} sub="Personas distintas (aprox.)." />
-    </div>
+                {/* cards “operación diaria” */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                  <StatCard label="Vistas del catálogo" value={statsLoading ? "…" : (stats?.catalogViews ?? "—")} sub="Cuántas veces abrieron tu catálogo." />
+                  <StatCard label="Visitantes únicos" value={statsLoading ? "…" : (stats?.uniqueVisitors ?? "—")} sub="Personas distintas (aprox.)." />
+                </div>
 
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-      <StatCard label="Vistas de productos" value={statsLoading ? "…" : (stats?.productViews ?? "—")} sub="Entraron a la página de un producto." />
-      <StatCard label="Clicks a producto" value={statsLoading ? "…" : (stats?.productClicks ?? "—")} sub="Click en “Ver detalles” desde el catálogo." />
-    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                  <StatCard label="Vistas de productos" value={statsLoading ? "…" : (stats?.productViews ?? "—")} sub="Entraron a la página de un producto." />
+                  <StatCard label="Clicks a producto" value={statsLoading ? "…" : (stats?.productClicks ?? "—")} sub="Click en “Ver detalles” desde el catálogo." />
+                </div>
 
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-      <StatCard label="Intención de compra" value={statsLoading ? "…" : (stats?.orderIntent ?? "—")} sub="Abrieron el formulario de pedido." />
-      <StatCard label="Pedidos enviados" value={statsLoading ? "…" : (stats?.orderSubmitOk ?? "—")} sub="Enviaron el pedido correctamente." />
-    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                  <StatCard label="Intención de compra" value={statsLoading ? "…" : (stats?.orderIntent ?? "—")} sub="Abrieron el formulario de pedido." />
+                  <StatCard label="Pedidos enviados" value={statsLoading ? "…" : (stats?.orderSubmitOk ?? "—")} sub="Enviaron el pedido correctamente." />
+                </div>
 
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-      <StatCard label="Clicks a WhatsApp" value={statsLoading ? "…" : (stats?.whatsappClicks ?? "—")} sub="Intentaron contactarte por WhatsApp." />
-      <StatCard
-        label="Créditos disponibles"
-        value={creditsLeft ?? "—"}
-        sub="Para publicar productos nuevos."
-      />
-    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                  <StatCard label="Clicks a WhatsApp" value={statsLoading ? "…" : (stats?.whatsappClicks ?? "—")} sub="Intentaron contactarte por WhatsApp." />
+                  <StatCard
+                    label="Créditos disponibles"
+                    value={creditsLeft ?? "—"}
+                    sub="Para publicar productos nuevos."
+                  />
+                </div>
 
-    {/* conversión simple (sin charts) */}
-    <div
-      style={{
-        padding: 12,
-        borderRadius: 16,
-        border: "1px solid rgba(15,23,42,0.10)",
-        background: "rgba(15,23,42,0.02)",
-        fontWeight: 850,
-        color: "rgba(15,23,42,0.75)",
-      }}
-    >
-      <div style={{ fontWeight: 950, marginBottom: 6 }}>¿Cómo avanzan tus clientes?</div>
-<div
-  style={{
-    fontSize: 12.5,
-    fontWeight: 800,
-    color: "rgba(15,23,42,0.70)",
-    lineHeight: 1.5,
-  }}
->
-  {stats ? (
-    <>
-      <div style={{ fontWeight: 900, marginBottom: 6 }}>
-        ¿Cómo avanzan tus clientes?
-      </div>
+                {/* conversión simple (sin charts) */}
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 16,
+                    border: "1px solid rgba(15,23,42,0.10)",
+                    background: "rgba(15,23,42,0.02)",
+                    fontWeight: 850,
+                    color: "rgba(15,23,42,0.75)",
+                  }}
+                >
+                  <div style={{ fontWeight: 950, marginBottom: 6 }}>¿Cómo avanzan tus clientes?</div>
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      color: "rgba(15,23,42,0.70)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {stats ? (
+                      <>
+                        <div style={{ fontWeight: 900, marginBottom: 6 }}>
+                          ¿Cómo avanzan tus clientes?
+                        </div>
 
-      {/* Catálogo → Producto */}
-      {(() => {
-        const pct =
-          stats.catalogViews > 0
-            ? Math.round(
-                (stats.productClicks / Math.max(1, stats.catalogViews)) * 100
-              )
-            : 0;
+                        {/* Catálogo → Producto */}
+                        {(() => {
+                          const pct =
+                            stats.catalogViews > 0
+                              ? Math.round(
+                                (stats.productClicks / Math.max(1, stats.catalogViews)) * 100
+                              )
+                              : 0;
 
-        return (
-          <div>
-            📖 <b>Catálogo → Producto</b>:{" "}
-            <b style={{ color: pctColor(pct) }}>{pct}%</b>{" "}
-            <span style={{ fontWeight: 700 }}>
-              de quienes abren tu catálogo hacen clic en un producto.
-            </span>
-          </div>
-        );
-      })()}
+                          return (
+                            <div>
+                              📖 <b>Catálogo → Producto</b>:{" "}
+                              <b style={{ color: pctColor(pct) }}>{pct}%</b>{" "}
+                              <span style={{ fontWeight: 700 }}>
+                                de quienes abren tu catálogo hacen clic en un producto.
+                              </span>
+                            </div>
+                          );
+                        })()}
 
-      {/* Producto → Intento */}
-      {(() => {
-        const pct =
-          stats.productViews > 0
-            ? Math.round(
-                (stats.orderIntent / Math.max(1, stats.productViews)) * 100
-              )
-            : 0;
+                        {/* Producto → Intento */}
+                        {(() => {
+                          const pct =
+                            stats.productViews > 0
+                              ? Math.round(
+                                (stats.orderIntent / Math.max(1, stats.productViews)) * 100
+                              )
+                              : 0;
 
-        return (
-          <div>
-            👀 <b>Producto → Intento</b>:{" "}
-            <b style={{ color: pctColor(pct) }}>{pct}%</b>{" "}
-            <span style={{ fontWeight: 700 }}>
-              de quienes ven un producto intentan comprar.
-            </span>
-          </div>
-        );
-      })()}
+                          return (
+                            <div>
+                              👀 <b>Producto → Intento</b>:{" "}
+                              <b style={{ color: pctColor(pct) }}>{pct}%</b>{" "}
+                              <span style={{ fontWeight: 700 }}>
+                                de quienes ven un producto intentan comprar.
+                              </span>
+                            </div>
+                          );
+                        })()}
 
-      {/* Intento → Pedido */}
-      {(() => {
-        const pct =
-          stats.orderIntent > 0
-            ? Math.round(
-                (stats.orderSubmitOk / Math.max(1, stats.orderIntent)) * 100
-              )
-            : 0;
+                        {/* Intento → Pedido */}
+                        {(() => {
+                          const pct =
+                            stats.orderIntent > 0
+                              ? Math.round(
+                                (stats.orderSubmitOk / Math.max(1, stats.orderIntent)) * 100
+                              )
+                              : 0;
 
-        return (
-          <div>
-            🛒 <b>Intento → Pedido</b>:{" "}
-            <b style={{ color: pctColor(pct) }}>{pct}%</b>{" "}
-            <span style={{ fontWeight: 700 }}>
-              de los intentos terminan enviando un pedido.
-            </span>
-          </div>
-        );
-      })()}
+                          return (
+                            <div>
+                              🛒 <b>Intento → Pedido</b>:{" "}
+                              <b style={{ color: pctColor(pct) }}>{pct}%</b>{" "}
+                              <span style={{ fontWeight: 700 }}>
+                                de los intentos terminan enviando un pedido.
+                              </span>
+                            </div>
+                          );
+                        })()}
 
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 11.5,
-          fontWeight: 700,
-          color: "rgba(15,23,42,0.55)",
-        }}
-      >
-        💡 Con pocos visitantes, los porcentajes pueden verse muy altos.
-      </div>
-    </>
-  ) : (
-    <>—</>
-  )}
-</div>
-    </div>
-  </div>
-) : null}
+                        <div
+                          style={{
+                            marginTop: 6,
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: "rgba(15,23,42,0.55)",
+                          }}
+                        >
+                          💡 Con pocos visitantes, los porcentajes pueden verse muy altos.
+                        </div>
+                      </>
+                    ) : (
+                      <>—</>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {tosOpen ? (
+              <div
+                role="dialog"
+                aria-modal="true"
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(15,23,42,0.55)",
+                  display: "grid",
+                  placeItems: "center",
+                  zIndex: 9999,
+                  padding: 16,
+                }}
+                onClick={() => (tosBusy ? null : setTosOpen(false))}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: "min(560px, 100%)",
+                    borderRadius: 18,
+                    background: "#fff",
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div style={{ padding: 16, borderBottom: "1px solid rgba(15,23,42,0.08)" }}>
+                    <div style={{ fontWeight: 950, fontSize: 16, color: "rgba(15,23,42,0.92)" }}>
+                      Acepta Términos y Condiciones
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 800, color: "rgba(15,23,42,0.62)", lineHeight: 1.45 }}>
+                      Para publicar productos necesitas aceptar los Términos y el Aviso de Privacidad.
+                    </div>
+                  </div>
+
+                  <div style={{ padding: 16, display: "grid", gap: 12 }}>
+                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <input
+                        type="checkbox"
+                        checked={tosChecked}
+                        onChange={(e) => setTosChecked(e.target.checked)}
+                        disabled={tosBusy}
+                        style={{ marginTop: 3 }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 850, color: "rgba(15,23,42,0.78)", lineHeight: 1.45 }}>
+                        Acepto los{" "}
+                        <a href="/terms.html" target="_blank" rel="noreferrer" style={{ fontWeight: 950 }}>
+                          Términos y Condiciones
+                        </a>{" "}
+                        y el{" "}
+                        <a href="/privacy.html" target="_blank" rel="noreferrer" style={{ fontWeight: 950 }}>
+                          Aviso de Privacidad
+                        </a>
+                        .
+                      </span>
+                    </label>
+
+                    {tosErr ? (
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          background: "rgba(220,38,38,0.06)",
+                          border: "1px solid rgba(220,38,38,0.18)",
+                          color: "rgba(127,29,29,0.95)",
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                        }}
+                        role="alert"
+                      >
+                        ⚠️ {tosErr}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div
+                    style={{
+                      padding: 16,
+                      display: "flex",
+                      gap: 10,
+                      justifyContent: "flex-end",
+                      borderTop: "1px solid rgba(15,23,42,0.08)",
+                      background: "rgba(15,23,42,0.02)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="lp__btn lp__btn--ghost"
+                      disabled={tosBusy}
+                      onClick={() => setTosOpen(false)}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="button"
+                      className="lp__btn lp__btn--primary"
+                      disabled={!tosChecked || tosBusy}
+                      onClick={async () => {
+                        setTosErr(null);
+                        setTosBusy(true);
+                        try {
+                          await acceptSellerConsent();
+                          setTosAccepted(true);
+                          setTosOpen(false);
+                          navigate("/publicar/producto");
+                        } catch (e: any) {
+                          setTosErr(e?.message || "No se pudo guardar tu aceptación.");
+                        } finally {
+                          setTosBusy(false);
+                        }
+                      }}
+                      style={{
+                        opacity: !tosChecked || tosBusy ? 0.7 : 1,
+                        cursor: !tosChecked || tosBusy ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {tosBusy ? "Guardando..." : "Aceptar y continuar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="lp__detailRight">

@@ -42,17 +42,11 @@ function planCreditsFallback(plan?: PlanKey) {
 
 function buildWhatsAppShareLink(catalogUrl: string) {
   const msg =
-    `¡Hola! 👋\n` +
+    `¡Hola! \n` +
     `Te comparto mi catálogo en Lokaly:\n` +
     `${catalogUrl}\n\n` +
     `Si te interesa algo, escríbeme por aquí.`;
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
-}
-
-// ✅ helper: considera inválido si no parece /catalog/<slug>
-function looksLikeCatalogUrl(url?: string) {
-  if (!url) return false;
-  return /\/catalog\/[^/]+$/i.test(url);
 }
 
 export default function PublishSuccessPage() {
@@ -75,28 +69,34 @@ export default function PublishSuccessPage() {
     if (loading) return;
     if (!ok) return;
 
-    // si el state ya trae un link bueno, lo usamos
-    if (looksLikeCatalogUrl(state.catalogUrl)) {
-      setCatalogUrl(state.catalogUrl!);
-      return;
-    }
-
     let alive = true;
 
     (async () => {
       try {
         setResolving(true);
-        const catalog = await getMyPublisherCatalog().catch(() => null);
 
-        const slug = (catalog as any)?.catalogSlug as string | undefined;
+        // (opcional) log para ver qué trae el state
+        console.log("state.catalogUrl =>", state.catalogUrl);
+
+        const catalog = await getMyPublisherCatalog().catch(() => null);
+        console.log("getMyPublisherCatalog() =>", catalog);
+
+        const c: any = catalog;
+
+        const slug =
+          c?.catalogSlug ??
+          c?.publicSlug ??
+          c?.slug ??
+          null;
+
         if (!slug) throw new Error("CATALOG_SLUG_MISSING");
 
         const url = `https://lokaly.site/catalog/${slug}`;
 
         if (!alive) return;
         setCatalogUrl(url);
-      } catch {
-        // fallback: si no se pudo resolver, manda a panel (no a publicar)
+      } catch (e) {
+        console.log("error resolving catalog url", e);
         if (!alive) return;
         navigate("/publicar/mis-productos", { replace: true });
       } finally {
