@@ -41,6 +41,10 @@ type PublicCatalogResponse = {
    Helpers
 ======================= */
 
+function resolveCatalogId(slug?: string) {
+  return slug && slug.trim() ? slug : "unknown";
+}
+
 export function resolveImageUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
 
@@ -125,6 +129,66 @@ function imagesToUrls(
       return resolveImageUrl(raw);
     })
     .filter(Boolean) as string[];
+}
+
+// =======================
+// Analytics (public)
+// =======================
+
+const ANALYTICS_BASE = `${PUBLIC_BASE_URL}/v1/analytics`;
+
+function getVisitorId(): string {
+  try {
+    const key = "lokaly_visitor_id";
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `vid_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    // si localStorage está bloqueado, igual mandamos algo
+    return `vid_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+  }
+}
+
+function shouldSendOnce(key: string, ttlMs: number): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    const now = Date.now();
+    if (raw) {
+      const last = Number(raw);
+      if (Number.isFinite(last) && now - last < ttlMs) return false;
+    }
+    localStorage.setItem(key, String(now));
+    return true;
+  } catch {
+    return true; // si no hay storage, mandamos siempre
+  }
+}
+
+async function trackEvent(payload: {
+  name: string;
+  domain: string;
+  visitorId?: string;
+  catalogId?: string;
+  productId?: string;
+  path?: string;
+  props?: Record<string, any>;
+}) {
+  try {
+    await fetch(`${ANALYTICS_BASE}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // no rompemos UX por analytics
+  }
 }
 
 /* =======================
@@ -392,6 +456,30 @@ export function PublicCatalogPage() {
       if (!normalized.products.length) throw new Error("Catálogo no encontrado.");
 
       setData(normalized);
+
+      setData(normalized);
+
+      // ✅ Analytics: CATALOG_VIEW (1 vez cada 10 min por catálogo)
+      const visitorId = getVisitorId();
+      const catalogId = resolveCatalogId(slug); // fallback
+      const onceKey = `lokaly_evt_catalog_view_${catalogId}`;
+
+      if (shouldSendOnce(onceKey, 10 * 60 * 1000)) {
+        trackEvent({
+          name: "CATALOG_VIEW",
+          domain: "catalog",
+          visitorId,
+          catalogId,
+          path: window.location.pathname,
+          props: {
+            slug,
+            sellerName: normalized.seller?.name,
+            productsCount: normalized.products?.length ?? 0,
+            ua: navigator.userAgent,
+          },
+        });
+      }
+
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "Error cargando catálogo");
@@ -416,10 +504,34 @@ export function PublicCatalogPage() {
     }
   }
 
-  const openWhatsAppGeneral = () => {
-    if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
-    openWhatsApp(seller.whatsapp, `Hola! Vi tu catálogo (${window.location.href}) y me interesa un producto.`);
-  };
+const openWhatsAppGeneral = () => {
+  if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
+
+  // ✅ Analytics: WHATSAPP_CLICK (catalog header)
+  try {
+    const visitorId = getVisitorId();
+    const catalogId = seller?.id || slug || "unknown";
+
+    trackEvent({
+      name: "WHATSAPP_CLICK",
+      domain: "whatsapp",
+      visitorId,
+      catalogId,
+      path: window.location.pathname,
+      props: {
+        source: "catalog_header",
+        slug,
+        sellerName: seller?.name,
+        productsCount: data?.products?.length ?? 0,
+      },
+    });
+  } catch {}
+
+  openWhatsApp(
+    seller.whatsapp,
+    `Hola! Vi tu catálogo (${window.location.href}) y me interesa un producto.`
+  );
+};
 
   const filteredProducts = useMemo(() => {
     const list = data?.products ?? [];
@@ -579,9 +691,33 @@ export function PublicCatalogPage() {
                       </div>
 
                       <div style={s.cardActions}>
-                        <button onClick={() => navigate(`/p/${p.id}`)} style={s.btnGhostWide}>
-                          Ver Detalles
-                        </button>
+<button
+  onClick={() => {
+    const visitorId = getVisitorId();
+    const catalogId = resolveCatalogId(slug);
+
+    trackEvent({
+      name: "PRODUCT_CLICK",
+      domain: "catalog",
+      visitorId,
+      catalogId,
+      productId: p.id,
+      path: window.location.pathname,
+      props: {
+        slug,
+        sellerName: seller?.name,
+        productName: p.name,
+        price: p.price,
+        featured: !!p.featured,
+      },
+    });
+
+    navigate(`/p/${p.id}`);
+  }}
+  style={s.btnGhostWide}
+>
+  Ver Detalles
+</button>
                       </div>
                     </div>
                   </article>

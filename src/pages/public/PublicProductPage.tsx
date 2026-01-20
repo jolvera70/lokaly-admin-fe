@@ -41,9 +41,95 @@ type OrderRequestPayload = {
   buyerWhatsapp: string;
 };
 
+
+// =======================
+// Analytics (public)
+// =======================
+
+const ANALYTICS_BASE = `${PUBLIC_BASE_URL}/v1/analytics`;
+
+function getVisitorId(): string {
+  try {
+    const key = "lokaly_visitor_id";
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `vid_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    // si localStorage está bloqueado, igual mandamos algo
+    return `vid_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+  }
+}
+
+function shouldSendOnce(key: string, ttlMs: number): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    const now = Date.now();
+    if (raw) {
+      const last = Number(raw);
+      if (Number.isFinite(last) && now - last < ttlMs) return false;
+    }
+    localStorage.setItem(key, String(now));
+    return true;
+  } catch {
+    return true; // si no hay storage, mandamos siempre
+  }
+}
+
+async function trackEvent(payload: {
+  name: string;
+  domain: string;
+  visitorId?: string;
+  catalogId?: string;
+  productId?: string;
+  path?: string;
+  props?: Record<string, any>;
+}) {
+  try {
+    await fetch(`${ANALYTICS_BASE}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // no rompemos UX por analytics
+  }
+}
+
 /* =======================
    Helpers
 ======================= */
+function pickSellerWhatsapp(raw: any): string | undefined {
+  // 1) directo / legacy
+  const direct =
+    raw?.sellerWhatsapp ||
+    raw?.seller?.whatsapp ||
+    raw?.seller?.phoneE164 ||
+    raw?.seller?.phone ||
+    raw?.whatsapp;
+
+  if (direct) return String(direct);
+
+  // 2) nuevo: publisher catalog (lo más confiable en tu caso)
+  const pc =
+    raw?.publisherCatalog ||
+    raw?.catalog ||
+    raw?.publisherCatalogInfo ||
+    raw?.catalogOwner;
+
+  const fromCatalog = pc?.phoneE164 || pc?.phoneLocal;
+  if (fromCatalog) return String(fromCatalog);
+
+  // 3) fallback plano
+  const plain = raw?.phoneE164 || raw?.phoneLocal;
+  return plain ? String(plain) : undefined;
+}
 
 // Útil para armar URLs de assets que vienen como path.
 // - Si ya es http(s) => la deja
@@ -573,24 +659,54 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
         if (url) imgObjects.unshift({ originalUrl: url, mediumUrl: url, thumbUrl: url });
       }
 
-      const normalized: PublicProductDetail = {
-        id: raw.id,
-        name: raw.title ?? raw.name,
-        price: Number(raw.price ?? 0),
-        description: raw.description ?? raw.shortDescription ?? raw.longDescription,
-        images: imgObjects,
-        featured: !!raw.featured,
-        availableQuantity: raw.availableQuantity ?? null,
-        seller: {
-          id: raw.sellerId ?? "",
-          name: raw.sellerName ?? "Vendedor",
-          slug: raw.sellerSlug ?? "",
-          whatsapp: raw.sellerWhatsapp ?? undefined,
-          clusterName: raw.clusterName ?? raw.sellerClusterName ?? undefined,
-        },
-      };
+const sellerWhatsapp = pickSellerWhatsapp(raw);
+
+const normalized: PublicProductDetail = {
+  id: raw.id,
+  name: raw.title ?? raw.name,
+  price: Number(raw.price ?? 0),
+  description: raw.description ?? raw.shortDescription ?? raw.longDescription,
+  images: imgObjects,
+  featured: !!raw.featured,
+  availableQuantity: raw.availableQuantity ?? null,
+  seller: {
+    id: raw.sellerId ?? raw.publisherCatalogId ?? "",
+    name: raw.sellerName ?? raw.catalogName ?? "Vendedor",
+    slug: raw.sellerSlug ?? raw.catalogSlug ?? raw.slug ?? "",
+    whatsapp: sellerWhatsapp,
+    clusterName: raw.clusterName ?? raw.sellerClusterName ?? raw.catalogClusterName ?? undefined,
+  },
+};
 
       setData(normalized);
+
+      setData(normalized);
+
+      // ✅ Analytics: PRODUCT_VIEW (1 vez cada 10 min por producto)
+      const visitorId = getVisitorId();
+      const catalogId = normalized.seller?.id || normalized.seller?.slug || "unknown";
+      const pid = normalized.id;
+
+      const onceKey = `lokaly_evt_product_view_${pid}`;
+      if (shouldSendOnce(onceKey, 10 * 60 * 1000)) {
+        trackEvent({
+          name: "PRODUCT_VIEW",
+          domain: "catalog",
+          visitorId,
+          catalogId,
+          productId,
+          path: window.location.pathname,
+          props: {
+            sellerName: normalized.seller?.name,
+            sellerSlug: normalized.seller?.slug,
+            productName: normalized.name,
+            price: normalized.price,
+            featured: !!normalized.featured,
+            ua: navigator.userAgent,
+          },
+        });
+      }
+
     } catch (e: any) {
       console.error(e);
       setError(e.message || "Error cargando producto");
@@ -621,12 +737,38 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
   const isOutOfStock = available === 0;
   const maxQty = available == null ? 99 : Math.max(0, Number(available));
 
-  function openOrderModal() {
-    setOrderOk(null);
-    setQty(1);
-    setNote("");
-    setOrderOpen(true);
-  }
+function openOrderModal() {
+  // ✅ Analytics: ORDER_INTENT (cada click cuenta)
+  try {
+    const visitorId = getVisitorId();
+    const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+    const pid = data?.id;
+
+    if (pid) {
+      trackEvent({
+        name: "ORDER_INTENT",
+        domain: "order",
+        visitorId,
+        catalogId,
+        productId: pid,
+        path: window.location.pathname,
+        props: {
+          sellerName: data?.seller?.name,
+          sellerSlug: data?.seller?.slug,
+          productName: data?.name,
+          price: data?.price,
+          availableQuantity: data?.availableQuantity ?? null,
+          featured: !!data?.featured,
+        },
+      });
+    }
+  } catch {}
+
+  setOrderOk(null);
+  setQty(1);
+  setNote("");
+  setOrderOpen(true);
+}
 
   const canSubmit = useMemo(() => {
     if (!data) return false;
@@ -655,6 +797,28 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
         buyerWhatsapp: cleanPhone(buyerWhatsapp),
       };
 
+      // ✅ Analytics: ORDER_SUBMIT (cada click cuenta)
+      try {
+        const visitorId = getVisitorId();
+        const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+
+        trackEvent({
+          name: "ORDER_SUBMIT",
+          domain: "order",
+          visitorId,
+          catalogId,
+          productId: data.id,
+          path: window.location.pathname,
+          props: {
+            qty,
+            hasNote: !!(payload.note && payload.note.length > 0),
+            availableQuantity: data.availableQuantity ?? null,
+            price: data.price,
+          },
+        });
+      } catch {}
+
+      
       // Nota: este endpoint es "placeholder" (ajústalo a tu BE real)
       const res = await fetch(`${PUBLIC_BASE_URL}/order-requests`, {
         method: "POST",
@@ -674,7 +838,45 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
       const saved = await res.json().catch(() => ({}));
       setOrderOk({ id: saved?.id });
       toast("Solicitud enviada ✅");
+
+            // ✅ Analytics: OK
+      try {
+        const visitorId = getVisitorId();
+        const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+
+        trackEvent({
+          name: "ORDER_SUBMIT_OK",
+          domain: "order",
+          visitorId,
+          catalogId,
+          productId: data.id,
+          path: window.location.pathname,
+          props: {
+            qty,
+            orderId: saved?.id ?? null,
+          },
+        });
+      } catch {}
     } catch (e: any) {
+      // ✅ Analytics: FAIL
+      try {
+        const visitorId = getVisitorId();
+        const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+
+        trackEvent({
+          name: "ORDER_SUBMIT_FAIL",
+          domain: "order",
+          visitorId,
+          catalogId,
+          productId: data?.id,
+          path: window.location.pathname,
+          props: {
+            qty,
+            error: e?.message ? String(e.message).slice(0, 180) : "unknown",
+          },
+        });
+      } catch {}
+
       alert(e?.message || "Error enviando solicitud");
     } finally {
       setSubmitting(false);
@@ -827,12 +1029,36 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
                 Copiar link
               </button>
 
-              <button
-                onClick={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)}
-                style={s.bottomWhats}
-              >
-                WhatsApp
-              </button>
+<button
+  onClick={() => {
+    // ✅ Analytics: WHATSAPP_CLICK (product page)
+    try {
+      const visitorId = getVisitorId();
+      const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+
+      trackEvent({
+        name: "WHATSAPP_CLICK",
+        domain: "whatsapp",
+        visitorId,
+        catalogId,
+        productId: data?.id,
+        path: window.location.pathname,
+        props: {
+          source: "product_cta",
+          sellerName: data?.seller?.name,
+          sellerSlug: data?.seller?.slug,
+          productName: data?.name,
+          price: data?.price,
+        },
+      });
+    } catch {}
+
+    openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
+  }}
+  style={s.bottomWhats}
+>
+  WhatsApp
+</button>
 
               <button
                 onClick={openOrderModal}
@@ -884,7 +1110,32 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
         canSubmit={canSubmit}
         onSubmit={submitOrderRequest}
         orderOk={orderOk}
-        onOpenWhats={() => openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage)}
+          onOpenWhats={() => {
+    // ✅ Analytics: WHATSAPP_CLICK (after order success)
+    try {
+      const visitorId = getVisitorId();
+      const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+
+      trackEvent({
+        name: "WHATSAPP_CLICK",
+        domain: "whatsapp",
+        visitorId,
+        catalogId,
+        productId: data?.id,
+        path: window.location.pathname,
+        props: {
+          source: "order_success",
+          sellerName: data?.seller?.name,
+          sellerSlug: data?.seller?.slug,
+          productName: data?.name,
+          price: data?.price,
+          orderId: orderOk?.id ?? null,
+        },
+      });
+    } catch {}
+
+    openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
+  }}
       />
     </div>
   );

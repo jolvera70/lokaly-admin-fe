@@ -537,6 +537,8 @@ export async function createPublishProductDraft(params: {
   price: string;
   description?: string;
   primaryIndex?: number;
+  featured: boolean;
+  quantity: number;
   images: File[];
 }): Promise<CreateProductDraftResponse> {
   const fd = new FormData();
@@ -544,6 +546,8 @@ export async function createPublishProductDraft(params: {
   fd.append("price", params.price);
   fd.append("description", params.description ?? "");
   fd.append("primaryIndex", String(params.primaryIndex ?? 0));
+  fd.append("featured", String(Boolean(params.featured)));
+  fd.append("quantity", String(Math.max(1, Number(params.quantity || 1))));  
   params.images.forEach((file) => fd.append("images", file));
 
   const res = await publicFetch(publicUrl(`/v1/catalog/products/draft`), {

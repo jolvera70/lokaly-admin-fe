@@ -40,6 +40,12 @@ function sanitizeMoneyInput(v: string) {
   return `${intPart}.${decPart}`;
 }
 
+function sanitizeIntInput(v: string) {
+  const only = v.replace(/[^\d]/g, "");
+  // evita "" si borran
+  return only;
+}
+
 function isImageFile(file: File) {
   return file.type.startsWith("image/");
 }
@@ -76,6 +82,9 @@ export default function ProductFormPage() {
   const [creditsLeft, setCreditsLeft] = useState<number>(0);
   const [creditsValidUntil, setCreditsValidUntil] = useState<string | null>(null);
 
+  const [featured, setFeatured] = useState(false); // ✅ NUEVO
+  const [quantity, setQuantity] = useState("1");   // ✅ NUEVO (string para input)
+
   // ✅ cleanup: revoke de todas las previews al desmontar
   useEffect(() => {
     return () => {
@@ -86,12 +95,17 @@ export default function ProductFormPage() {
 
   const priceDigits = useMemo(() => onlyDigits(price), [price]);
 
+  const qtyNum = useMemo(() => {
+    const n = Number(quantity || "0");
+    return Number.isFinite(n) ? n : 0;
+  }, [quantity]);
+
   const isValid = useMemo(() => {
     const hasImage = images.length > 0;
     const hasTitle = title.trim().length >= 2;
     const hasPrice = sanitizeMoneyInput(price).length > 0 && priceDigits.length >= 1;
     return hasImage && hasTitle && hasPrice;
-  }, [images.length, title, price, priceDigits]);
+  }, [images.length, title, price, priceDigits, qtyNum]);
 
   // ✅ NUEVO: cargar créditos del publisher (si hay sesión ok)
   const loadCredits = useCallback(async () => {
@@ -249,6 +263,8 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
         description: draft.description,
         primaryIndex: draft.primaryIndex,
         images: draft.images.map((i) => i.file),
+        featured,
+        quantity: qtyNum,
       });
 
       // ✅ 2) Si tiene créditos -> publicar directo
@@ -598,7 +614,6 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onBlur={() => setTouched(true)}
-                  placeholder="Ej. Pay de queso casero"
                   style={{
                     width: "100%",
                     border: "1px solid rgba(15,23,42,0.14)",
@@ -630,7 +645,6 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
                     onChange={(e) => setPrice(sanitizeMoneyInput(e.target.value))}
                     onBlur={() => setTouched(true)}
                     inputMode="decimal"
-                    placeholder="180"
                     style={{ flex: 1, border: "none", outline: "none", fontSize: 16, fontWeight: 900, color: "#0f172a", background: "transparent" }}
                     disabled={submitting}
                   />
@@ -646,6 +660,150 @@ async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
                   </div>
                 ) : null}
               </div>
+
+                            {/* Cantidad disponible */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 900, color: "rgba(15,23,42,0.75)", marginBottom: 8 }}>
+                  Cantidad disponible
+                </label>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setQuantity((q) => String(Math.max(1, Number(q || "1") - 1)))}
+                    disabled={submitting}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      border: "1px solid rgba(15,23,42,0.14)",
+                      background: "rgba(255,255,255,0.95)",
+                      cursor: "pointer",
+                      fontWeight: 950,
+                    }}
+                  >
+                    −
+                  </button>
+
+                  <input
+                    value={quantity}
+                    onChange={(e) => setQuantity(sanitizeIntInput(e.target.value))}
+                    onBlur={(e) => {
+                      setTouched(true);
+                      // normaliza a mínimo 1
+                      const n = Number(e.currentTarget.value || "0");
+                      if (!Number.isFinite(n) || n < 1) setQuantity("1");
+                    }}
+                    inputMode="numeric"
+                    placeholder="1"
+                    style={{
+                      flex: 1,
+                      border: "1px solid rgba(15,23,42,0.14)",
+                      borderRadius: 14,
+                      padding: "12px 14px",
+                      fontSize: 15,
+                      fontWeight: 900,
+                      outline: "none",
+                      opacity: submitting ? 0.7 : 1,
+                      textAlign: "center",
+                    }}
+                    disabled={submitting}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setQuantity((q) => String(Math.max(1, Number(q || "0") + 1)))}
+                    disabled={submitting}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      border: "1px solid rgba(15,23,42,0.14)",
+                      background: "rgba(255,255,255,0.95)",
+                      cursor: "pointer",
+                      fontWeight: 950,
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+
+                {touched && qtyNum < 1 ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "rgba(220,38,38,0.95)", fontWeight: 800 }}>
+                    La cantidad debe ser mínimo 1.
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "rgba(15,23,42,0.55)", fontWeight: 700 }}>
+                    Si se agota, luego podemos mostrar “Agotado”.
+                  </div>
+                )}
+              </div>
+
+{/* Destacado */}
+<div style={{ marginBottom: 14 }}>
+  <button
+    type="button"
+    onClick={() => setFeatured((v) => !v)}
+    disabled={submitting}
+    style={{
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      padding: "12px 14px",
+      borderRadius: 14,
+      border: "1px solid rgba(15,23,42,0.14)",
+      background: "rgba(255,255,255,0.95)",
+      cursor: "pointer",
+      fontWeight: 900,
+      color: "rgba(15,23,42,0.78)",
+      opacity: submitting ? 0.7 : 1,
+      textAlign: "left",
+    }}
+  >
+    <span>⭐ Marcar como destacado</span>
+
+    {/* switch */}
+    <span
+      aria-hidden
+      style={{
+        width: 44,
+        height: 26,
+        borderRadius: 999,
+        background: featured ? "rgba(34,197,94,0.25)" : "rgba(15,23,42,0.12)",
+        border: featured ? "1px solid rgba(34,197,94,0.40)" : "1px solid rgba(15,23,42,0.18)",
+        position: "relative",
+        flex: "0 0 auto",
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 3,
+          left: featured ? 22 : 3,
+          width: 20,
+          height: 20,
+          borderRadius: 999,
+          background: featured ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.95)",
+          border: "1px solid rgba(15,23,42,0.18)",
+          boxShadow: "0 8px 16px rgba(0,0,0,0.10)",
+          transition: "left 160ms ease",
+        }}
+      />
+    </span>
+  </button>
+
+  <div style={{ marginTop: 6, fontSize: 12, color: "rgba(15,23,42,0.55)", fontWeight: 700 }}>
+    Aparecerá primero en tu catálogo.
+  </div>
+</div>
 
               {/* Descripción */}
               <div style={{ marginBottom: 12 }}>
