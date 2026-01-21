@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
 import logoMark from "../../assets/brand/lokaly-mark.svg";
+import { SellerConsentModal } from "../../components/SellerConsentModal";
 
 import { usePublishGuard } from "../../hooks/usePublishGuard";
 import {
@@ -11,28 +12,11 @@ import {
   setCatalogProductPaused,
   type CatalogProductDto,
   getMyPublisherCatalog,
+  getSellerConsent,
 } from "../../api";
 
 const TOS_VERSION = "2026-01-20";
 
-async function getSellerConsent(): Promise<{ accepted: boolean; version?: string | null }> {
-  const res = await fetch("/api/public/v1/legal/seller/consent", { credentials: "include" });
-  if (!res.ok) {
-    // si falla, por seguridad NO bloquees (o sí, según tu preferencia)
-    return { accepted: true };
-  }
-  return (await res.json()) as any;
-}
-
-async function acceptSellerConsent(): Promise<void> {
-  const res = await fetch("/api/public/v1/legal/seller/consent", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ version: TOS_VERSION }),
-  });
-  if (!res.ok) throw new Error("No se pudo guardar tu aceptación.");
-}
 /* ================== TIPOS ================== */
 
 type StatsSummary = {
@@ -352,9 +336,6 @@ export default function MyProductsPage() {
   const [tosAccepted, setTosAccepted] = useState<boolean>(true);
   const [tosLoading, setTosLoading] = useState<boolean>(true);
   const [tosOpen, setTosOpen] = useState<boolean>(false);
-  const [tosChecked, setTosChecked] = useState<boolean>(false);
-  const [tosBusy, setTosBusy] = useState<boolean>(false);
-  const [tosErr, setTosErr] = useState<string | null>(null);
 
   // Si luego quieres cargar slug real, aquí
   const catalogSlug: string | null = null;
@@ -397,21 +378,34 @@ export default function MyProductsPage() {
     }
   }, [catalogId, statsDays]);
 
-  useEffect(() => {
-    if (loading) return;
-    if (!ok) return;
+useEffect(() => {
+  if (loading) return;
+  if (!ok) return;
 
-    (async () => {
-      setTosLoading(true);
-      try {
-        const s = await getSellerConsent();
-        const accepted = Boolean(s.accepted) && (s.version ? s.version === TOS_VERSION : true);
-        setTosAccepted(accepted);
-      } finally {
-        setTosLoading(false);
-      }
-    })();
-  }, [loading, ok]);
+  let alive = true;
+
+  (async () => {
+    setTosLoading(true);
+    try {
+      const s = await getSellerConsent();
+      const accepted =
+        Boolean((s as any)?.accepted) &&
+        String((s as any)?.version || "") === TOS_VERSION;
+
+      if (!alive) return;
+      setTosAccepted(accepted);
+    } catch {
+      if (!alive) return;
+      setTosAccepted(false);
+    } finally {
+      if (alive) setTosLoading(false);
+    }
+  })();
+
+  return () => {
+    alive = false;
+  };
+}, [loading, ok]);
 
   const goPublish = useCallback(async () => {
     // si todavía no sabemos, espera (o permite)
@@ -421,9 +415,6 @@ export default function MyProductsPage() {
       navigate("/publicar/producto");
       return;
     }
-
-    setTosErr(null);
-    setTosChecked(false);
     setTosOpen(true);
   }, [tosAccepted, tosLoading, navigate]);
 
@@ -1563,132 +1554,7 @@ export default function MyProductsPage() {
                 </div>
               </div>
             ) : null}
-
-            {tosOpen ? (
-              <div
-                role="dialog"
-                aria-modal="true"
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  background: "rgba(15,23,42,0.55)",
-                  display: "grid",
-                  placeItems: "center",
-                  zIndex: 9999,
-                  padding: 16,
-                }}
-                onClick={() => (tosBusy ? null : setTosOpen(false))}
-              >
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    width: "min(560px, 100%)",
-                    borderRadius: 18,
-                    background: "#fff",
-                    border: "1px solid rgba(15,23,42,0.12)",
-                    boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ padding: 16, borderBottom: "1px solid rgba(15,23,42,0.08)" }}>
-                    <div style={{ fontWeight: 950, fontSize: 16, color: "rgba(15,23,42,0.92)" }}>
-                      Acepta Términos y Condiciones
-                    </div>
-                    <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 800, color: "rgba(15,23,42,0.62)", lineHeight: 1.45 }}>
-                      Para publicar productos necesitas aceptar los Términos y el Aviso de Privacidad.
-                    </div>
-                  </div>
-
-                  <div style={{ padding: 16, display: "grid", gap: 12 }}>
-                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <input
-                        type="checkbox"
-                        checked={tosChecked}
-                        onChange={(e) => setTosChecked(e.target.checked)}
-                        disabled={tosBusy}
-                        style={{ marginTop: 3 }}
-                      />
-                      <span style={{ fontSize: 13, fontWeight: 850, color: "rgba(15,23,42,0.78)", lineHeight: 1.45 }}>
-                        Acepto los{" "}
-                        <a href="/terms.html" target="_blank" rel="noreferrer" style={{ fontWeight: 950 }}>
-                          Términos y Condiciones
-                        </a>{" "}
-                        y el{" "}
-                        <a href="/privacy.html" target="_blank" rel="noreferrer" style={{ fontWeight: 950 }}>
-                          Aviso de Privacidad
-                        </a>
-                        .
-                      </span>
-                    </label>
-
-                    {tosErr ? (
-                      <div
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: 12,
-                          background: "rgba(220,38,38,0.06)",
-                          border: "1px solid rgba(220,38,38,0.18)",
-                          color: "rgba(127,29,29,0.95)",
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                        }}
-                        role="alert"
-                      >
-                        ⚠️ {tosErr}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div
-                    style={{
-                      padding: 16,
-                      display: "flex",
-                      gap: 10,
-                      justifyContent: "flex-end",
-                      borderTop: "1px solid rgba(15,23,42,0.08)",
-                      background: "rgba(15,23,42,0.02)",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="lp__btn lp__btn--ghost"
-                      disabled={tosBusy}
-                      onClick={() => setTosOpen(false)}
-                    >
-                      Cancelar
-                    </button>
-
-                    <button
-                      type="button"
-                      className="lp__btn lp__btn--primary"
-                      disabled={!tosChecked || tosBusy}
-                      onClick={async () => {
-                        setTosErr(null);
-                        setTosBusy(true);
-                        try {
-                          await acceptSellerConsent();
-                          setTosAccepted(true);
-                          setTosOpen(false);
-                          navigate("/publicar/producto");
-                        } catch (e: any) {
-                          setTosErr(e?.message || "No se pudo guardar tu aceptación.");
-                        } finally {
-                          setTosBusy(false);
-                        }
-                      }}
-                      style={{
-                        opacity: !tosChecked || tosBusy ? 0.7 : 1,
-                        cursor: !tosChecked || tosBusy ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {tosBusy ? "Guardando..." : "Aceptar y continuar"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
-
           <div className="lp__detailRight">
             <div className="lp__detailImgWrap">
               <div style={{ width: "100%" }}>
@@ -1716,6 +1582,16 @@ export default function MyProductsPage() {
           </div>
         </section>
       </main>
+<SellerConsentModal
+  open={tosOpen}
+  tosVersion={TOS_VERSION}
+  onClose={() => setTosOpen(false)}
+  onAccepted={() => {
+    setTosAccepted(true);
+    setTosOpen(false);
+    navigate("/publicar/producto");
+  }}
+/>      
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../LandingPage.css";
+import { SellerConsentModal } from "../../components/SellerConsentModal";
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 
 import { usePublishGuard } from "../../hooks/usePublishGuard";
@@ -10,7 +11,6 @@ import {
   getMyPublisherCatalog,
   publishProduct,
   getSellerConsent,
-  acceptSellerConsent,
 } from "../../api";
 import { compressImageFile } from "../../utils/imageCompress";
 
@@ -87,11 +87,10 @@ export default function ProductFormPage() {
   const [featured, setFeatured] = useState(false); // ✅ NUEVO
   const [quantity, setQuantity] = useState("1");   // ✅ NUEVO (string para input)
   const [catalogSlug, setCatalogSlug] = useState<string | null>(null);
-const TOS_VERSION = "2026-01-20";
 
-const [tosOpen, setTosOpen] = useState(false);
-const [tosAccepted, setTosAccepted] = useState<boolean | null>(null);
-const [tosSaving, setTosSaving] = useState(false);
+  const TOS_VERSION = "2026-01-20";
+  const [tosOpen, setTosOpen] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState<boolean | null>(null);
 
 useEffect(() => {
   if (loading) return;
@@ -224,21 +223,6 @@ useEffect(() => {
     if (file.size > 50 * 1024 * 1024) return "La imagen es demasiado pesada (máx 50MB).";
     return null;
   }
-
-  async function onAcceptTos() {
-  try {
-    setTosSaving(true);
-    await acceptSellerConsent(TOS_VERSION);
-    setTosAccepted(true);
-    setTosOpen(false);
-    setSubmitErr(null);
-  } catch (e) {
-    console.log("[TOS] accept error:", e);
-    alert("No se pudo guardar tu aceptación. Intenta de nuevo.");
-  } finally {
-    setTosSaving(false);
-  }
-}
 
   async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     setImgErr(null);
@@ -956,72 +940,22 @@ useEffect(() => {
           </div>
         </section>
       </main>
-{tosOpen ? (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.55)",
-      zIndex: 9999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 16,
-    }}
-  >
-    <div
-      style={{
-        width: "min(720px, 100%)",
-        maxHeight: "85vh",
-        overflow: "auto",
-        background: "#fff",
-        borderRadius: 18,
-        padding: 16,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-      }}
-    >
-      <div style={{ fontWeight: 950, fontSize: 16 }}>
-        Términos y Política de Privacidad
-      </div>
-
-      <div style={{ marginTop: 8, fontSize: 13, color: "rgba(15,23,42,0.75)", lineHeight: 1.5 }}>
-        Para publicar en Lokaly necesitas aceptar los Términos y la Política de Privacidad.
-      </div>
-
-      <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <a className="lp__btn lp__btn--ghost" href="/terms.html" target="_blank" rel="noreferrer">
-          Ver términos
-        </a>
-        <a className="lp__btn lp__btn--ghost" href="/privacy.html" target="_blank" rel="noreferrer">
-          Ver privacidad
-        </a>
-      </div>
-
-      <div style={{ marginTop: 14, display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <button
-          className="lp__btn lp__btn--ghost"
-          type="button"
-          onClick={() => {
-            setTosOpen(false);
-            setSubmitErr("Debes aceptar Términos y Privacidad para publicar.");
-          }}
-          disabled={tosSaving}
-        >
-          Cancelar
-        </button>
-
-        <button
-          className="lp__btn lp__btn--primary"
-          type="button"
-          onClick={onAcceptTos}
-          disabled={tosSaving}
-        >
-          {tosSaving ? "Guardando..." : "Acepto"}
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}         
+<SellerConsentModal
+  open={tosOpen}
+  tosVersion={TOS_VERSION}
+  onClose={() => {
+    setTosOpen(false);
+    // opcional: si quieres bloquear la publicación si cierra sin aceptar
+    if (tosAccepted !== true) {
+      setSubmitErr("Debes aceptar Términos y Privacidad para publicar.");
+    }
+  }}
+  onAccepted={() => {
+    setTosAccepted(true);
+    setTosOpen(false);
+    setSubmitErr(null);
+  }}
+/>     
     </div>
   );
 }
