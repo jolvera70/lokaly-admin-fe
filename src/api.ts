@@ -853,3 +853,26 @@ export async function fetchCatalogStatsSummary(
 
   return (await res.json()) as CatalogStatsSummary;
 }
+
+export async function getSellerConsent() {
+  const res = await fetch("/api/public/v1/legal/seller/consent", {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function acceptSellerConsent(version: string) {
+  const res = await fetch("/api/public/v1/legal/seller/consent", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(t || "CONSENT_FAILED");
+  }
+  return res.json();
+}
