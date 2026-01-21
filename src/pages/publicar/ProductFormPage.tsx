@@ -92,39 +92,39 @@ export default function ProductFormPage() {
   const [tosOpen, setTosOpen] = useState(false);
   const [tosAccepted, setTosAccepted] = useState<boolean | null>(null);
 
-useEffect(() => {
-  if (loading) return;
-  if (!ok) return;
+  useEffect(() => {
+    if (loading) return;
+    if (!ok) return;
 
-  let alive = true;
+    let alive = true;
 
-  (async () => {
-    try {
-      console.log("[TOS] checking consent...");
+    (async () => {
+      try {
+        console.log("[TOS] checking consent...");
 
-      const consent = await getSellerConsent(); // puede ser null
-      console.log("[TOS] consent response:", consent);
+        const consent = await getSellerConsent(); // puede ser null
+        console.log("[TOS] consent response:", consent);
 
-      const accepted =
-        Boolean((consent as any)?.accepted) &&
-        String((consent as any)?.version || "") === TOS_VERSION;
+        const accepted =
+          Boolean((consent as any)?.accepted) &&
+          String((consent as any)?.version || "") === TOS_VERSION;
 
-      if (!alive) return;
-      setTosAccepted(accepted);
+        if (!alive) return;
+        setTosAccepted(accepted);
 
-      if (!accepted) setTosOpen(true);
-    } catch (e) {
-      console.log("[TOS] consent error:", e);
-      if (!alive) return;
-      setTosAccepted(false);
-      setTosOpen(true);
-    }
-  })();
+        if (!accepted) setTosOpen(true);
+      } catch (e) {
+        console.log("[TOS] consent error:", e);
+        if (!alive) return;
+        setTosAccepted(false);
+        setTosOpen(true);
+      }
+    })();
 
-  return () => {
-    alive = false;
-  };
-}, [loading, ok]);
+    return () => {
+      alive = false;
+    };
+  }, [loading, ok]);
 
   // ✅ cleanup: revoke de todas las previews al desmontar
   useEffect(() => {
@@ -316,10 +316,10 @@ useEffect(() => {
     if (submitting) return;
 
     if (tosAccepted !== true) {
-  setTosOpen(true);
-  setSubmitErr("Debes aceptar Términos y Privacidad para publicar.");
-  return;
-}
+      setTosOpen(true);
+      setSubmitErr("Debes aceptar Términos y Privacidad para publicar.");
+      return;
+    }
 
     const draft: ProductDraft = {
       phoneE164,
@@ -439,6 +439,7 @@ useEffect(() => {
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               <button
                 type="button"
+                disabled={!tosAccepted}
                 onClick={() => navigate("/publicar/mis-productos")}
                 style={{
                   border: "1px solid rgba(15,23,42,0.14)",
@@ -475,6 +476,45 @@ useEffect(() => {
               🕒 Tu publicación estará activa <strong>30 días</strong>. Podrás editarla después.
             </div>
 
+            {/* Aviso TOS (si no ha aceptado) */}
+            {tosAccepted !== true && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: "rgba(220,38,38,0.06)",
+                  border: "1px solid rgba(220,38,38,0.18)",
+                  color: "rgba(127,29,29,0.95)",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+                role="alert"
+              >
+                <span>⚠️ Debes aceptar Términos y Privacidad para publicar.</span>
+
+                <button
+                  type="button"
+                  onClick={() => setTosOpen(true)}
+                  className="lp__btn lp__btn--ghost"
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    fontWeight: 900,
+                    background: "rgba(255,255,255,0.9)",
+                    border: "1px solid rgba(15,23,42,0.14)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Aceptar ahora
+                </button>
+              </div>
+            )}
             {/* ✅ NUEVO: banderita de créditos */}
             {!creditsLoading && (
               <div
@@ -901,24 +941,24 @@ useEffect(() => {
                 />
               </div>
 
-        <button
-  className="lp__btn lp__btn--primary"
-  type="submit"
-  disabled={!isValid || submitting || creditsLoading || tosAccepted !== true}
-  style={{
-    width: "100%",
-    opacity: !isValid || submitting || creditsLoading || tosAccepted !== true ? 0.7 : 1,
-    cursor: !isValid || submitting || creditsLoading || tosAccepted !== true ? "not-allowed" : "pointer",
-  }}
->
-  {submitting ? "Procesando..." : primaryCtaText}
-</button>
+              <button
+                className="lp__btn lp__btn--primary"
+                type="submit"
+                disabled={!isValid || submitting || creditsLoading || tosAccepted !== true}
+                style={{
+                  width: "100%",
+                  opacity: !isValid || submitting || creditsLoading || tosAccepted !== true ? 0.7 : 1,
+                  cursor: !isValid || submitting || creditsLoading || tosAccepted !== true? "not-allowed" : "pointer",
+                }}
+              >
+                {submitting ? "Procesando..." : primaryCtaText}
+              </button>
 
               <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
                 {ctaSubText}
               </div>
             </form>
-          </div>   
+          </div>
           <div className="lp__detailRight">
             <div className="lp__detailImgWrap">
               <div style={{ width: "100%" }}>
@@ -936,26 +976,26 @@ useEffect(() => {
                   Tip: Una buena foto aumenta tus ventas.
                 </div>
               </div>
-            </div>      
+            </div>
           </div>
         </section>
       </main>
-<SellerConsentModal
-  open={tosOpen}
-  tosVersion={TOS_VERSION}
-  onClose={() => {
-    setTosOpen(false);
-    // opcional: si quieres bloquear la publicación si cierra sin aceptar
-    if (tosAccepted !== true) {
-      setSubmitErr("Debes aceptar Términos y Privacidad para publicar.");
-    }
-  }}
-  onAccepted={() => {
-    setTosAccepted(true);
-    setTosOpen(false);
-    setSubmitErr(null);
-  }}
-/>     
+      <SellerConsentModal
+        open={tosOpen}
+        tosVersion={TOS_VERSION}
+        onClose={() => {
+          setTosOpen(false);
+          // opcional: si quieres bloquear la publicación si cierra sin aceptar
+          if (tosAccepted !== true) {
+            setSubmitErr("Debes aceptar Términos y Privacidad para publicar.");
+          }
+        }}
+        onAccepted={() => {
+          setTosAccepted(true);
+          setTosOpen(false);
+          setSubmitErr(null);
+        }}
+      />
     </div>
   );
 }
