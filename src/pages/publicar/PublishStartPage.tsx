@@ -106,9 +106,22 @@ export function PublishStartPage() {
         if (flow?.email) setEmail(flow.email);
         if (flow?.phoneLocal) setPhone(flow.phoneLocal);
 
+const otpPending = hasPendingOtp(flow);
+
+// Ajusta este TTL a lo que uses en backend (ej 10 min)
+const OTP_TTL_MS = 10 * 60 * 1000;
+
+const otpFresh =
+  !!flow?.otpSessionId &&
+  !!flow?.otpRequestedAt &&
+  (Date.now() - Number(flow.otpRequestedAt)) < OTP_TTL_MS;
+
+if (otpPending && !otpFresh) {
+  clearPublishFlow(); // 🔥 rompe loops por OTP viejo
+}
+
         if (hasPendingOtp(flow)) {
           navigate("/publicar/verificar", {
-            replace: true,
             state: {
               phoneE164: flow!.phoneE164,
               phoneLocal: flow!.phoneLocal,

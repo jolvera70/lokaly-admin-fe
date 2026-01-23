@@ -5,7 +5,7 @@ import "../LandingPage.css";
 
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 import { usePublishGuard } from "../../hooks/usePublishGuard";
-import { fetchCatalogPlans, createCatalogCheckout, } from "../../api";
+import { fetchCatalogPlans, createCatalogCheckout } from "../../api";
 
 type ProductDraft = {
   phoneE164: string;
