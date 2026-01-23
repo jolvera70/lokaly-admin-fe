@@ -5,7 +5,7 @@ import "../LandingPage.css";
 
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 import { usePublishGuard } from "../../hooks/usePublishGuard";
-import { fetchCatalogPlans, createCatalogCheckout, fakeCompleteCatalogCheckout, publishCatalogProduct } from "../../api";
+import { fetchCatalogPlans, createCatalogCheckout, } from "../../api";
 
 type ProductDraft = {
   phoneE164: string;
@@ -247,64 +247,57 @@ export default function PaymentPage() {
 
   const primaryPreview = draft?.images?.[safePrimaryIndex]?.previewUrl ?? null;
 
-  async function onPay() {
-    if (!draft || !productId) return;
-    if (!selectedPlan) return;
+async function onPay() {
+  if (!draft || !productId) return;
+  if (!selectedPlan) return;
 
-    setLoading(true);
-    setPayErr(null);
+  setLoading(true);
+  setPayErr(null);
 
-    try {
-      // 1) crear checkout (order PENDING)
-      const order = await createCatalogCheckout(planKey);
-      // esperado:
-      // { orderId, status:"PENDING", amount, currency, credits, daysValid }
-      const orderId = (order as any)?.orderId as string | undefined;
-      if (!orderId) throw new Error("ORDER_ID_MISSING");
+  try {
+    // 1) crear checkout (order PENDING + checkoutUrl)
+    const order = await createCatalogCheckout(planKey);
 
-      // 2) fake complete (simula el pago)
-      await fakeCompleteCatalogCheckout(orderId);
+    const orderId = (order as any)?.orderId as string | undefined;
+    const checkoutUrl = (order as any)?.checkoutUrl as string | undefined;
 
-      // 3) publicar producto (consume 1 crédito ATÓMICO)
-      const published = await publishCatalogProduct(productId);
+    if (!orderId) throw new Error("ORDER_ID_MISSING");
+    if (!checkoutUrl) throw new Error("CHECKOUT_URL_MISSING");
 
-      // 4) navegar a listo
+    // 2) guardar contexto para continuar después del redirect
+localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
+  productId,
+  planKey,
+  orderId,
+  title: draft.title,
+  phoneE164: draft.phoneE164,
+  phoneLocal: draft.phoneLocal,
+  amount: order.amount ?? priceToPay,
+  currency: order.currency ?? "MXN",
+  credits: order.credits ?? selectedPlan.credits,
+  daysValid: order.daysValid ?? selectedPlan.daysValid ?? 30,
+  createdAt: Date.now(),
+}));
 
-      navigate("/publicar/listo", {
-        replace: true,
-        state: {
-          productId,
-          orderId,
-          plan: planKey,
-          amountPaid: order.amount ?? priceToPay,
-          currency: order.currency ?? "MXN",
-          credits: order.credits ?? selectedPlan.credits,
-          daysValid: order.daysValid ?? selectedPlan.daysValid ?? 30,
-          title: draft.title,
-          phoneE164: draft.phoneE164,
-          phoneLocal: draft.phoneLocal,
-          imagesCount: draft.images?.length ?? 0,
-          published, // opcional
-        },
-      });
-    } catch (err: any) {
-      const status = err?.status ?? err?.response?.status;
-      const msgRaw = String(err?.message ?? "");
+    // 3) redirigir a Stripe
+    window.location.href = checkoutUrl;
+  } catch (err: any) {
+    const status = err?.status ?? err?.response?.status;
+    const msgRaw = String(err?.message ?? "");
 
-      // errores típicos de tu BE (por si los mandas como texto)
-      if (status === 401) {
-        setPayErr("Tu sesión expiró. Vuelve a verificar tu número.");
-      } else if (msgRaw.includes("NO_CREDITS")) {
-        setPayErr("No se pudieron asignar créditos. Intenta nuevamente.");
-      } else if (msgRaw.includes("ACCESS_EXPIRED")) {
-        setPayErr("Tu acceso expiró. Vuelve a verificar tu número.");
-      } else {
-        setPayErr("No se pudo completar el pago/publicación. Intenta nuevamente.");
-      }
-    } finally {
-      setLoading(false);
+    if (status === 401) {
+      setPayErr("Tu sesión expiró. Vuelve a verificar tu número.");
+    } else if (msgRaw.includes("ORDER_ID_MISSING")) {
+      setPayErr("No pudimos iniciar el pago. Intenta nuevamente.");
+    } else if (msgRaw.includes("CHECKOUT_URL_MISSING")) {
+      setPayErr("No se pudo abrir el pago. Intenta nuevamente.");
+    } else {
+      setPayErr("No se pudo iniciar el pago. Intenta nuevamente.");
     }
+  } finally {
+    setLoading(false);
   }
+}
 
   if (guardLoading) return null;
   if (!ok) return null;

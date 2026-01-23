@@ -31,6 +31,8 @@ import PaymentPage from "./pages/publicar/PaymentPage";
 import PublishSuccessPage  from "./pages/publicar/PublishSuccessPage";
 import MyProductsPage from "./pages/publicar/MyProductsPage";
 import EditProductPage from "./pages/publicar/EditProductPage";
+import { PaymentCancelPage } from "./pages/publicar/PaymentCancelPage";
+import { PaymentSuccessPage } from "./pages/publicar/PaymentSuccessPage";
 
 
 // Públicas
@@ -157,6 +159,8 @@ function App() {
         <Route path="/publicar/listo" element={<PublishSuccessPage />} />
         <Route path="/publicar/mis-productos" element={<MyProductsPage />} />
         <Route path="/publicar/editar/:productId" element={<EditProductPage />} />
+        <Route path="/publicar/pago-cancelado" element={<PaymentCancelPage />} />
+        <Route path="/publicar/pago-exito" element={<PaymentSuccessPage />} />
 
         {/* 🔑 Login */}
         <Route
@@ -186,6 +190,7 @@ function App() {
           <Route path="/admin/seller/stats" element={<SellerStatsPage />} />
           <Route path="/admin/seller/settings" element={<SellerSettingsPage />} />
           <Route path="/admin/seller/checkout" element={<SellerCheckoutPage />} />
+
           
 
           {/* Admin puede abrir catálogos también */}

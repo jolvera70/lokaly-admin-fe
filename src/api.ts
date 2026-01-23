@@ -481,7 +481,7 @@ export async function getPublishSession(): Promise<PublishSessionDto | null> {
 
 export type SendOtpRequest = {
   phoneE164: string;
-  channel: "WHATSAPP";
+  email: string;
 };
 
 export type SendOtpResponse = {
@@ -495,11 +495,11 @@ export type VerifyOtpRequest = {
   code: string;
 };
 
-export async function sendPublicOtp(phoneE164: string): Promise<SendOtpResponse> {
+export async function sendPublicOtp(phoneE164: string, email: string): Promise<SendOtpResponse> {
   const res = await publicFetch(publicUrl(`/v1/otp/send`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phoneE164, channel: "WHATSAPP" } satisfies SendOtpRequest),
+    body: JSON.stringify({ phoneE164, email } satisfies SendOtpRequest),
   });
 
   if (!res.ok) {
@@ -608,6 +608,7 @@ export type CreateCatalogCheckoutResponse = {
   currency: string;
   credits: number;
   daysValid: number;
+  checkoutUrl?: string;
 };
 
 export async function createCatalogCheckout(planKey: CatalogCheckoutPlanKey) {
@@ -875,4 +876,33 @@ export async function acceptSellerConsent(version: string) {
     throw new Error(t || "CONSENT_FAILED");
   }
   return res.json();
+}
+
+export type CheckoutOrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "EXPIRED";
+
+export type CheckoutOrderDto = {
+  id: string;
+  status: CheckoutOrderStatus;
+  amount: number;
+  currency: string;
+  credits: number;
+  daysValid: number;
+  paidAt?: string | null;
+  creditsAppliedAt?: string | null;
+};
+
+export async function getCheckoutOrder(orderId: string): Promise<CheckoutOrderDto> {
+  const res = await publicFetch(publicUrl(`/v1/catalog/checkout/${encodeURIComponent(orderId)}`), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || "No se pudo consultar el checkout");
+    (err as any).status = res.status;
+    throw err;
+  }
+
+  return (await res.json()) as CheckoutOrderDto;
 }

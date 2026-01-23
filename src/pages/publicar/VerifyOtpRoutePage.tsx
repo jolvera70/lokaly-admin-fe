@@ -6,6 +6,7 @@ import { sendPublicOtp, verifyPublicOtp } from "../../api";
 
 type NavState = {
   phoneE164?: string;
+  email?: string;
   otpSessionId?: string;
   cooldownSeconds?: number;
 };
@@ -17,7 +18,6 @@ export default function VerifyOtpRoutePage() {
 
   const { loading, session } = usePublishSession();
 
-  // Fuente de verdad inicial: session si existe; si no, state
   const initialPhoneE164 = useMemo(
     () => session?.phoneE164 ?? navState.phoneE164 ?? "",
     [session?.phoneE164, navState.phoneE164]
@@ -33,63 +33,76 @@ export default function VerifyOtpRoutePage() {
     [navState.cooldownSeconds]
   );
 
-  // ✅ Ahora sí: state local (se actualiza en resend)
+  const initialEmail = useMemo(
+    () => navState.email ?? "",
+    [navState.email]
+  );
+
   const [phoneE164, setPhoneE164] = useState(initialPhoneE164);
   const [otpSessionId, setOtpSessionId] = useState(initialOtpSessionId);
   const [cooldownSeconds, setCooldownSeconds] = useState(initialCooldown);
+  const [email, setEmail] = useState(initialEmail);
 
-  // ✅ Para evitar “closure viejo” en onVerify
   const otpSessionIdRef = useRef(otpSessionId);
   useEffect(() => {
     otpSessionIdRef.current = otpSessionId;
   }, [otpSessionId]);
 
-  // ✅ Cuando llega session del backend (si existe), sincroniza
   useEffect(() => {
     if (loading) return;
 
     const p = session?.phoneE164 ?? navState.phoneE164 ?? "";
     const sid = session?.otpSessionId ?? navState.otpSessionId ?? "";
+    const em = navState.email ?? "";
 
     setPhoneE164(p);
     setOtpSessionId(sid);
+    setEmail(em);
 
-    // si backend ya verified, avanza
     if (session?.verified) {
       navigate("/publicar/producto", { replace: true });
+      return;
     }
 
-    // si no hay nada, regresa
-    if (!p || !sid) {
+    // ✅ ahora también requerimos email para poder reenviar
+    if (!p || !sid || !em) {
       navigate("/publicar", { replace: true });
     }
-  }, [loading, session?.phoneE164, session?.otpSessionId, session?.verified, navState.phoneE164, navState.otpSessionId, navigate]);
+  }, [
+    loading,
+    session?.phoneE164,
+    session?.otpSessionId,
+    session?.verified,
+    navState.phoneE164,
+    navState.otpSessionId,
+    navState.email,
+    navigate,
+  ]);
 
   if (loading) return null;
-  if (!phoneE164 || !otpSessionId) return null;
+  if (!phoneE164 || !otpSessionId || !email) return null;
 
   return (
     <VerifyOtpPage
       phoneE164={phoneE164}
       initialCooldownSeconds={cooldownSeconds}
       onVerify={async (code) => {
-        // ✅ SIEMPRE usa el último sessionId (aunque acabes de reenviar)
         const latest = otpSessionIdRef.current;
         await verifyPublicOtp(latest, code);
         navigate("/publicar/producto", { replace: true });
       }}
       onResend={async () => {
-        const resp = await sendPublicOtp(phoneE164);
+        // ✅ ahora requiere email
+        const resp = await sendPublicOtp(phoneE164, email);
 
-        // ✅ CLAVE: actualizar al nuevo otpSessionId
         setOtpSessionId(resp.otpSessionId);
         setCooldownSeconds(resp.cooldownSeconds ?? 60);
 
-        // ✅ también actualiza el history state para refresh
         navigate(".", {
           replace: true,
           state: {
             phoneE164,
+            email,
             otpSessionId: resp.otpSessionId,
             cooldownSeconds: resp.cooldownSeconds ?? 60,
           } satisfies NavState,

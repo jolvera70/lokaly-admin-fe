@@ -1,4 +1,5 @@
 // src/publicFlow.ts
+export type PublishOtpChannel = "email" | "sms" | "whatsapp";
 
 export type PublishFlowDraft = {
   phoneE164: string;     // +524771234567
@@ -10,6 +11,8 @@ export type PublishFlowDraft = {
 
   verified?: boolean;
   verifiedAt?: number;  // Date.now()
+  email?: string;
+  channel?: PublishOtpChannel;
 };
 
 const KEY = "lokaly_publish_flow_v1";

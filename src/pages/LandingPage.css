@@ -669,3 +669,62 @@
   border: 1px solid rgba(15, 23, 42, 0.14);
   background: rgba(255, 255, 255, 0.96);
 }
+/* Email más compacto para que no compita con el teléfono */
+.lp__input--compact {
+  height: 42px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+/* Hint más sutil */
+.lp__hint {
+  opacity: 0.8;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* Labels un poco más ligeros */
+.lp__label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* Input row (tipo grupo) */
+.lp__inputRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Chip con icono (similar al +52) */
+.lp__iconChip {
+  height: 44px;
+  min-width: 54px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  font-size: 18px;
+}
+
+/* Input dentro de row */
+.lp__input--row {
+  height: 44px;
+  border-radius: 14px;
+  flex: 1;
+}
+
+/* Compacto más “tight” */
+.lp__hint--tight {
+  margin-top: 6px;
+  font-size: 12.5px;
+  opacity: 0.75;
+}
+
+/* Label secundario */
+.lp__label--muted {
+  opacity: 0.75;
+}
