@@ -891,11 +891,15 @@ export type CheckoutOrderDto = {
   creditsAppliedAt?: string | null;
 };
 
-export async function getCheckoutOrder(orderId: string): Promise<CheckoutOrderDto> {
-  const res = await publicFetch(publicUrl(`/v1/catalog/checkout/${encodeURIComponent(orderId)}`), {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
+export async function getCheckoutOrder(orderId: string, token?: string): Promise<CheckoutOrderDto> {
+  const t = token ? `?t=${encodeURIComponent(token)}` : "";
+  const res = await publicFetch(
+    publicUrl(`/v1/catalog/checkout/${encodeURIComponent(orderId)}${t}`),
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    }
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -904,5 +908,19 @@ export async function getCheckoutOrder(orderId: string): Promise<CheckoutOrderDt
     throw err;
   }
 
+  return (await res.json()) as CheckoutOrderDto;
+}
+
+export async function confirmCheckout(orderId: string, sessionId: string): Promise<CheckoutOrderDto> {
+  const res = await publicFetch(publicUrl(`/v1/catalog/checkout/confirm`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ orderId, sessionId }),
+  });
+
+    if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw Object.assign(new Error(txt || "CONFIRM_FAILED"), { status: res.status });
+  }
   return (await res.json()) as CheckoutOrderDto;
 }
