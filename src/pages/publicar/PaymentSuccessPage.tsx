@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../LandingPage.css";
 
 import logoMark from "../../assets/brand/lokaly-mark.svg";
-import { confirmCheckout, getCheckoutOrder } from "../../api";
+import { confirmCheckout, getCheckoutOrder, publishCatalogProduct } from "../../api";
 
 type Status = "loading" | "paid" | "pending" | "error";
 
@@ -43,10 +43,6 @@ export function PaymentSuccessPage() {
   
 
   useEffect(() => {
-    
-  console.log("orderId:", orderId);
-  console.log("sessionId:", sessionId);
-  console.log("token:", token);
 
     if (!orderId || !sessionId) {
       setStatus("error");
@@ -70,6 +66,24 @@ const poll = async () => {
       setStatus("paid");
       setCredits(res.credits ?? null);
       setDetail(null);
+  // ✅ si venías de "pagar para publicar este producto"
+  if (pending?.productId) {
+    try {
+      await publishCatalogProduct(pending.productId);
+      clearPendingPayment();
+      // opcional: redirigir directo al listado o al dashboard
+      navigate("/publicar", { replace: true });
+      return;
+    } catch (err: any) {
+      // OJO: pago OK pero publicar falló
+      setDetail(
+        "El pago se confirmó, pero no pudimos publicar tu producto automáticamente. " +
+        "Vuelve a /publicar e inténtalo otra vez."
+      );
+      // NO borres el pending, para que el usuario pueda reintentar
+      return;
+    }
+  }      
       clearPendingPayment();
       return;
     }
