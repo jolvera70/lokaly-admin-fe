@@ -11,6 +11,7 @@ import {
   getMyPublisherCatalog,
   publishProduct,
   getSellerConsent,
+  listMyCatalogProducts
 } from "../../api";
 import { compressImageFile } from "../../utils/imageCompress";
 
@@ -91,6 +92,29 @@ export default function ProductFormPage() {
   const TOS_VERSION = "2026-01-20";
   const [tosOpen, setTosOpen] = useState(false);
   const [tosAccepted, setTosAccepted] = useState<boolean | null>(null);
+
+  const [activePosts, setActivePosts] = useState<number>(0);
+
+  const [hoverAdmin, setHoverAdmin] = useState(false);
+  const [hoverCatalog, setHoverCatalog] = useState(false);
+
+  const loadActivePosts = useCallback(async () => {
+    if (!ok) return;
+    try {
+      const products = await listMyCatalogProducts({ draft: false });
+      // Ajusta según tus flags reales:
+      const active = (products || []).filter((p: any) => !p.deleted && !p.paused).length;
+      setActivePosts(active);
+    } catch {
+      setActivePosts(0);
+    }
+  }, [ok]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!ok) return;
+    loadActivePosts();
+  }, [loading, ok, loadActivePosts]);
 
   useEffect(() => {
     if (loading) return;
@@ -437,39 +461,73 @@ export default function ProductFormPage() {
             <div className="lp__detailKicker">Publica tu producto</div>
             <div className="lp__detailTitle">Crea tu publicación</div>
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                disabled={!tosAccepted}
-                onClick={() => navigate("/publicar/mis-productos")}
-                style={{
-                  border: "1px solid rgba(15,23,42,0.14)",
-                  background: "rgba(255,255,255,0.95)",
-                  borderRadius: 999,
-                  padding: "10px 14px",
-                  fontWeight: 950,
-                  cursor: "pointer",
-                  boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
-                }}
-              >
-                📦 Administrar mis productos
-              </button>
+<button
+  type="button"
+  disabled={!tosAccepted}
+  onClick={() => navigate("/publicar/mis-productos")}
 
+  onMouseEnter={() => setHoverAdmin(true)}
+  onMouseLeave={() => setHoverAdmin(false)}
+
+  style={{
+    border: "1px solid rgba(37,99,235,0.35)",
+    background: "rgba(37,99,235,0.08)",
+    color: "rgba(30,64,175,0.95)",
+    borderRadius: 999,
+    padding: "11px 16px",
+    fontWeight: 950,
+    cursor: "pointer",
+    boxShadow: hoverAdmin
+      ? "0 14px 28px rgba(37,99,235,0.18)"
+      : "0 10px 22px rgba(37,99,235,0.12)",
+
+    transition: "all 160ms ease",
+
+    transform: hoverAdmin
+      ? "translateY(-2px)"
+      : "translateY(0)",
+  }}
+>
+  📦 Administrar mis productos
+</button>
 
               {catalogSlug && (
-                <button
-                  type="button"
-                  onClick={() => window.open(`https://lokaly.site/catalog/${catalogSlug}`, "_blank")}
-                  style={{
-                    border: "1px solid rgba(15,23,42,0.14)",
-                    background: "rgba(15,23,42,0.04)",
-                    borderRadius: 999,
-                    padding: "10px 14px",
-                    fontWeight: 950,
-                    cursor: "pointer",
-                  }}
-                >
-                  🔗 Ver mi catálogo
-                </button>
+
+<button
+  type="button"
+  onClick={() =>
+    window.open(`https://lokaly.site/catalog/${catalogSlug}`, "_blank")
+  }
+
+  onMouseEnter={() => setHoverCatalog(true)}
+  onMouseLeave={() => setHoverCatalog(false)}
+
+  style={{
+    border: "1px solid rgba(15,23,42,0.18)",
+    background: hoverCatalog
+      ? "rgba(15,23,42,0.08)"
+      : "rgba(15,23,42,0.04)",
+
+    color: "rgba(15,23,42,0.9)",
+
+    borderRadius: 999,
+    padding: "11px 16px",
+    fontWeight: 900,
+    cursor: "pointer",
+
+    boxShadow: hoverCatalog
+      ? "0 10px 22px rgba(15,23,42,0.14)"
+      : "0 6px 14px rgba(15,23,42,0.08)",
+
+    transform: hoverCatalog
+      ? "translateY(-1px)"
+      : "translateY(0)",
+
+    transition: "all 160ms ease",
+  }}
+>
+  🔗 Ver mi catálogo
+</button>
               )}
             </div>
             <div className="lp__detailText">
@@ -516,31 +574,135 @@ export default function ProductFormPage() {
               </div>
             )}
             {/* ✅ NUEVO: banderita de créditos */}
-            {!creditsLoading && (
-              <div
-                style={{
-                  marginTop: 10,
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: hasCredits ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(15,23,42,0.10)",
-                  background: hasCredits ? "rgba(34,197,94,0.06)" : "rgba(15,23,42,0.02)",
-                  color: "rgba(15,23,42,0.78)",
-                  fontSize: 12.5,
-                  fontWeight: 850,
-                }}
-              >
-                {hasCredits ? (
-                  <>
-                    ✅ Tienes <b>{creditsLeft}</b> publicación(es) disponible(s)
-                    {creditsValidUntil ? (
-                      <span style={{ opacity: 0.7 }}> · vigencia: {new Date(creditsValidUntil).toLocaleDateString("es-MX")}</span>
-                    ) : null}
-                  </>
-                ) : (
-                  <>ℹ️ No tienes publicaciones disponibles. Continúa al pago para activar tu catálogo.</>
-                )}
-              </div>
-            )}
+<div
+  style={{
+    marginTop: 10,
+    padding: "10px 12px",
+    borderRadius: 14,
+
+    border: "1px solid rgba(34,197,94,0.45)",
+    background:"linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))",
+    color: "rgba(20,83,45,0.95)",
+
+    fontSize: 12.5,
+    fontWeight: 850,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  }}
+>
+  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    <span aria-hidden>{hasCredits ? "✅" : "ℹ️"}</span>
+    <span style={{ fontWeight: 950 }}>
+      {hasCredits ? "Publicaciones" : "Publicaciones"}
+    </span>
+  </div>
+
+  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    {/* Chip: disponibles */}
+<span
+  style={{
+    padding: "6px 10px",
+    borderRadius: 999,
+
+    background: hasCredits
+      ? "rgba(34,197,94,0.15)"
+      : "rgba(255,255,255,0.85)",
+
+    border: hasCredits
+      ? "1px solid rgba(34,197,94,0.45)"
+      : "1px solid rgba(15,23,42,0.12)",
+
+    fontWeight: 950,
+
+    color: hasCredits
+      ? "rgba(20,83,45,0.95)"
+      : "rgba(15,23,42,0.85)",
+  }}
+>
+  Disponibles: <b style={{ fontWeight: 1000 }}>{creditsLeft}</b>
+</span>
+
+    {/* Chip: activas */}
+    <span
+      style={{
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: "rgba(15,23,42,0.06)",
+        border: "1px solid rgba(15,23,42,0.10)",
+        fontWeight: 950,
+        color: "rgba(15,23,42,0.78)",
+      }}
+    >
+      Activas: <b style={{ fontWeight: 1000 }}>{activePosts}</b>
+    </span>
+
+    {/* Chip: vigencia (opcional) */}
+    {creditsValidUntil ? (
+      <span
+        style={{
+          padding: "6px 10px",
+          borderRadius: 999,
+          background: "rgba(245,158,11,0.10)",
+          border: "1px solid rgba(245,158,11,0.18)",
+          fontWeight: 950,
+          color: "rgba(15,23,42,0.78)",
+        }}
+      >
+        Vigencia:{" "}
+        <b style={{ fontWeight: 1000 }}>
+          {new Date(creditsValidUntil).toLocaleDateString("es-MX")}
+        </b>
+      </span>
+    ) : null}
+  </div>
+</div>
+
+{/* Mensaje cuando no hay disponibles */}
+{creditsLeft <= 0 && (
+  <div
+    style={{
+      width: "100%",
+      marginTop: 10,
+      padding: "8px 10px",
+      borderRadius: 12,
+      background: "rgba(245,158,11,0.08)",
+      border: "1px solid rgba(245,158,11,0.25)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      flexWrap: "wrap",
+      fontSize: 12.5,
+      fontWeight: 850,
+      color: "rgba(15,23,42,0.8)",
+    }}
+  >
+    <div style={{ lineHeight: 1.4 }}>
+      ⚠️ Ya no tienes publicaciones disponibles.  
+      Compra otro paquete o administra tus productos actuales.
+    </div>
+
+    <div style={{ display: "flex", gap: 8 }}>
+      <button
+        type="button"
+        onClick={() => navigate("/publicar/mis-productos")}
+        style={{
+          border: "1px solid rgba(15,23,42,0.15)",
+          background: "rgba(255,255,255,0.9)",
+          borderRadius: 999,
+          padding: "6px 12px",
+          fontWeight: 900,
+          cursor: "pointer",
+        }}
+      >
+        Administrar
+      </button>
+    </div>
+  </div>
+)}
 
             {submitErr ? (
               <div
@@ -948,7 +1110,7 @@ export default function ProductFormPage() {
                 style={{
                   width: "100%",
                   opacity: !isValid || submitting || creditsLoading || tosAccepted !== true ? 0.7 : 1,
-                  cursor: !isValid || submitting || creditsLoading || tosAccepted !== true? "not-allowed" : "pointer",
+                  cursor: !isValid || submitting || creditsLoading || tosAccepted !== true ? "not-allowed" : "pointer",
                 }}
               >
                 {submitting ? "Procesando..." : primaryCtaText}
