@@ -358,7 +358,7 @@ export default function LandingPage() {
 
       <a
         className="lp__footerWhatsapp"
-        href="https://wa.me/528182082264text=Hola%20necesito%20soporte%20con%20Lokaly"
+        href="https://wa.me/528182082264?text=Hola%20necesito%20soporte%20con%20Lokaly"
         target="_blank"
         rel="noreferrer"
       >
