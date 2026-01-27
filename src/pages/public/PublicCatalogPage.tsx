@@ -475,15 +475,19 @@ export function PublicCatalogPage() {
 
   const seller = data?.seller;
 
-  const copyCatalogLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      alert("No se pudo copiar el enlace");
-    }
-  };
+const copyCatalogLink = async () => {
+  try {
+    const base = window.location.origin; // https://lokaly.site
+    const publicUrl = `${base}/catalog/${encodeURIComponent(slug || "")}`;
+
+    await navigator.clipboard.writeText(publicUrl);
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  } catch (e) {
+    alert("No se pudo copiar el enlace");
+  }
+};
 
   const filteredProducts = useMemo(() => {
     const list = data?.products ?? [];
