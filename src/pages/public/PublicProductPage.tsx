@@ -69,7 +69,7 @@ async function submitReport(payload: {
     try {
       const j = await res.json();
       msg = j?.message || j?.error || msg;
-    } catch {}
+    } catch { }
     throw new Error(msg);
   }
 }
@@ -191,8 +191,8 @@ function imagesToUrls(
         size === "thumb"
           ? img.thumbUrl
           : size === "medium"
-          ? img.mediumUrl
-          : img.originalUrl;
+            ? img.mediumUrl
+            : img.originalUrl;
 
       return resolveImageUrl(raw);
     })
@@ -435,8 +435,8 @@ function OrderSheet({
     availableQty == null
       ? "Disponibilidad por confirmar"
       : availableQty === 0
-      ? "Agotado"
-      : `Quedan ${availableQty} disponibles`;
+        ? "Agotado"
+        : `Quedan ${availableQty} disponibles`;
 
   return (
     <div style={s.sheetBackdrop} onClick={onClose}>
@@ -728,7 +728,7 @@ function ReportModal({
                         path: window.location.pathname,
                         props: { reason },
                       });
-                    } catch {}
+                    } catch { }
 
                     setDone(true);
                     toast("Reporte enviado ✅");
@@ -905,32 +905,32 @@ export function PublicProductPage() {
 
       const raw = await res.json();
 
-const pick = (x: any): CatalogImageDto[] => {
-  if (!Array.isArray(x)) return [];
+      const pick = (x: any): CatalogImageDto[] => {
+        if (!Array.isArray(x)) return [];
 
-  // objects [{thumbUrl, mediumUrl, originalUrl}]
-  if (x.length === 0) return [];
-  if (typeof x[0] === "object" && x[0] !== null) {
-    return x as CatalogImageDto[];
-  }
+        // objects [{thumbUrl, mediumUrl, originalUrl}]
+        if (x.length === 0) return [];
+        if (typeof x[0] === "object" && x[0] !== null) {
+          return x as CatalogImageDto[];
+        }
 
-  // legacy strings ["/api/.../t.jpg", ...]
-  if (typeof x[0] === "string") {
-    return (x as string[])
-      .map((u) => {
-        const url = resolveImageUrl(u);
-        if (!url) return null;
-        return { thumbUrl: url, mediumUrl: url, originalUrl: url };
-      })
-      .filter(Boolean) as CatalogImageDto[];
-  }
+        // legacy strings ["/api/.../t.jpg", ...]
+        if (typeof x[0] === "string") {
+          return (x as string[])
+            .map((u) => {
+              const url = resolveImageUrl(u);
+              if (!url) return null;
+              return { thumbUrl: url, mediumUrl: url, originalUrl: url };
+            })
+            .filter(Boolean) as CatalogImageDto[];
+        }
 
-  return [];
-};
+        return [];
+      };
 
-const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
-  ? pick(raw.imageUrls)
-  : pick(raw.images);
+      const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
+        ? pick(raw.imageUrls)
+        : pick(raw.images);
 
       // compat legacy single
       const single = (raw.imageUrl as string | undefined) || (raw.image as string | undefined);
@@ -939,24 +939,24 @@ const imgObjects: CatalogImageDto[] = pick(raw.imageUrls).length
         if (url) imgObjects.unshift({ originalUrl: url, mediumUrl: url, thumbUrl: url });
       }
 
-const sellerWhatsapp = pickSellerWhatsapp(raw);
+      const sellerWhatsapp = pickSellerWhatsapp(raw);
 
-const normalized: PublicProductDetail = {
-  id: raw.id,
-  name: raw.title ?? raw.name,
-  price: Number(raw.price ?? 0),
-  description: raw.description ?? raw.shortDescription ?? raw.longDescription,
-  images: imgObjects,
-  featured: !!raw.featured,
-  availableQuantity: raw.availableQuantity ?? null,
-  seller: {
-    id: raw.sellerId ?? raw.publisherCatalogId ?? "",
-    name: raw.sellerName ?? raw.catalogName ?? "Vendedor",
-    slug: raw.sellerSlug ?? raw.catalogSlug ?? raw.slug ?? "",
-    whatsapp: sellerWhatsapp,
-    clusterName: raw.clusterName ?? raw.sellerClusterName ?? raw.catalogClusterName ?? undefined,
-  },
-};
+      const normalized: PublicProductDetail = {
+        id: raw.id,
+        name: raw.title ?? raw.name,
+        price: Number(raw.price ?? 0),
+        description: raw.description ?? raw.shortDescription ?? raw.longDescription,
+        images: imgObjects,
+        featured: !!raw.featured,
+        availableQuantity: raw.availableQuantity ?? null,
+        seller: {
+          id: raw.sellerId ?? raw.publisherCatalogId ?? "",
+          name: raw.sellerName ?? raw.catalogName ?? "Vendedor",
+          slug: raw.sellerSlug ?? raw.catalogSlug ?? raw.slug ?? "",
+          whatsapp: sellerWhatsapp,
+          clusterName: raw.clusterName ?? raw.sellerClusterName ?? raw.catalogClusterName ?? undefined,
+        },
+      };
 
       setData(normalized);
 
@@ -1017,38 +1017,38 @@ const normalized: PublicProductDetail = {
   const isOutOfStock = available === 0;
   const maxQty = available == null ? 99 : Math.max(0, Number(available));
 
-function openOrderModal() {
-  // ✅ Analytics: ORDER_INTENT (cada click cuenta)
-  try {
-    const visitorId = getVisitorId();
-    const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
-    const pid = data?.id;
+  function openOrderModal() {
+    // ✅ Analytics: ORDER_INTENT (cada click cuenta)
+    try {
+      const visitorId = getVisitorId();
+      const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+      const pid = data?.id;
 
-    if (pid) {
-      trackEvent({
-        name: "ORDER_INTENT",
-        domain: "order",
-        visitorId,
-        catalogId,
-        productId: pid,
-        path: window.location.pathname,
-        props: {
-          sellerName: data?.seller?.name,
-          sellerSlug: data?.seller?.slug,
-          productName: data?.name,
-          price: data?.price,
-          availableQuantity: data?.availableQuantity ?? null,
-          featured: !!data?.featured,
-        },
-      });
-    }
-  } catch {}
+      if (pid) {
+        trackEvent({
+          name: "ORDER_INTENT",
+          domain: "order",
+          visitorId,
+          catalogId,
+          productId: pid,
+          path: window.location.pathname,
+          props: {
+            sellerName: data?.seller?.name,
+            sellerSlug: data?.seller?.slug,
+            productName: data?.name,
+            price: data?.price,
+            availableQuantity: data?.availableQuantity ?? null,
+            featured: !!data?.featured,
+          },
+        });
+      }
+    } catch { }
 
-  setOrderOk(null);
-  setQty(1);
-  setNote("");
-  setOrderOpen(true);
-}
+    setOrderOk(null);
+    setQty(1);
+    setNote("");
+    setOrderOpen(true);
+  }
 
   const canSubmit = useMemo(() => {
     if (!data) return false;
@@ -1096,9 +1096,9 @@ function openOrderModal() {
             price: data.price,
           },
         });
-      } catch {}
+      } catch { }
 
-      
+
       // Nota: este endpoint es "placeholder" (ajústalo a tu BE real)
       const res = await fetch(`${PUBLIC_BASE_URL}/order-requests`, {
         method: "POST",
@@ -1111,7 +1111,7 @@ function openOrderModal() {
         try {
           const err = await res.json();
           msg = err?.message || err?.error || msg;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -1119,7 +1119,7 @@ function openOrderModal() {
       setOrderOk({ id: saved?.id });
       toast("Solicitud enviada ✅");
 
-            // ✅ Analytics: OK
+      // ✅ Analytics: OK
       try {
         const visitorId = getVisitorId();
         const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
@@ -1136,7 +1136,7 @@ function openOrderModal() {
             orderId: saved?.id ?? null,
           },
         });
-      } catch {}
+      } catch { }
     } catch (e: any) {
       // ✅ Analytics: FAIL
       try {
@@ -1155,7 +1155,7 @@ function openOrderModal() {
             error: e?.message ? String(e.message).slice(0, 180) : "unknown",
           },
         });
-      } catch {}
+      } catch { }
 
       alert(e?.message || "Error enviando solicitud");
     } finally {
@@ -1200,60 +1200,218 @@ function openOrderModal() {
   // ✅ URL list para el carousel
   const gallery = imagesToUrls(data.images, "medium");
 
-  return (
-    <div style={s.page}>
-      <div style={{ ...s.container, padding: isMobile ? "12px 12px 0" : "14px 14px 0" }}>
-        {/* Header */}
-        <header style={s.header}>
-          <button onClick={() => navigate(-1)} style={s.backBtn} aria-label="Volver">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#111827"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ display: "block" }}
-            >
+  const amzCss = `
+:root{
+  --bg:#EAEDED;
+  --card:#FFFFFF;
+  --border:rgba(15,23,42,.12);
+  --text:#0F1111;
+  --muted:#565959;
+  --nav:#131921;
+  --nav2:#232F3E;
+  --accent:#F3A847;
+  --accent2:#F7D27A;
+  --shadow:0 10px 18px rgba(15,23,42,.08);
+}
+
+.amzPage{ min-height:100vh; background:var(--bg); color:var(--text); }
+.amzWrap{ max-width: 820px; margin:0 auto; padding: 12px 12px 0; }
+
+.amzTopbar{
+  position: sticky; top:0; z-index: 30;
+  background: var(--nav);
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 20px rgba(0,0,0,.18);
+}
+.amzTopRow{ display:flex; gap:10px; align-items:center; }
+.amzBack{
+  width: 40px; height: 40px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.amzBack:hover{ background: rgba(255,255,255,.10); }
+
+.amzBrand{ min-width:0; }
+.amzBrandTitle{ font-weight:1000; font-size:18px; line-height:1.1; color:#fff; }
+.amzBrandSub{ margin-top:2px; font-size:12px; font-weight:800; color: rgba(255,255,255,.72); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.amzTopActions{ margin-left:auto; display:flex; gap:8px; }
+.amzIcon{
+  width: 40px; height: 40px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.amzIcon:hover{ background: rgba(255,255,255,.10); }
+
+.amzCard{
+  margin-top: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.amzBody{ padding: 14px; }
+
+.amzTitleRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.amzH1{
+  margin:0;
+  font-size: 20px;
+  font-weight: 1000;
+  line-height: 1.15;
+  color: var(--text);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.amzPrice{ font-size: 18px; font-weight: 1000; margin-top: 8px; color: var(--text); }
+
+.amzPills{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 8px; }
+.amzPill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: rgba(15,23,42,.03);
+  font-size: 12px;
+  font-weight: 900;
+}
+.amzPillGreen{ border-color: rgba(34,197,94,.22); background: rgba(34,197,94,.10); color:#0f5132; }
+.amzPillOut{ border-color: rgba(185,28,28,.18); background: rgba(185,28,28,.08); color:#991b1b; }
+.amzPillFeatured{ border-color: rgba(243,168,71,.35); background: rgba(243,168,71,.18); color:#7c5a00; }
+
+.amzDesc{ margin: 10px 0 0; color: #374151; font-size: 14px; line-height: 1.55; }
+.amzDescMuted{ margin: 10px 0 0; color: #9CA3AF; font-size: 14px; line-height: 1.55; }
+
+.amzReportRow{ margin-top: 12px; display:flex; justify-content:flex-end; }
+.amzReportBtn{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,23,42,.12);
+  background:#fff;
+  cursor:pointer;
+  font-weight: 900;
+  font-size: 12px;
+  color: var(--text);
+}
+.amzReportBtn:hover{ box-shadow: 0 10px 18px rgba(15,23,42,.08); }
+
+.amzCta{
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: #FAFAF9;
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.amzBtnGhost{
+  flex:1;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,23,42,.14);
+  background:#fff;
+  cursor:pointer;
+  font-weight: 1000;
+  font-size: 12px;
+  color: var(--text);
+}
+.amzBtnGhost:hover{ box-shadow: 0 10px 18px rgba(15,23,42,.08); }
+
+.amzBtnWhats{
+  flex:1;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: none;
+  background: #22C55E;
+  color: #fff;
+  cursor:pointer;
+  font-weight: 1000;
+  font-size: 12px;
+}
+.amzBtnPrimary{
+  flex:1.1;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.18);
+  background: linear-gradient(180deg, var(--accent2), var(--accent));
+  color: #111827;
+  cursor:pointer;
+  font-weight: 1000;
+  font-size: 12px;
+}
+.amzBtnDisabled{ background: #9CA3AF !important; border-color: transparent !important; cursor:not-allowed !important; color:#fff !important; }
+
+.amzSeller{
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: #fff;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:space-between;
+}
+.amzSellerName{ font-weight: 1000; font-size: 13px; color: var(--text); }
+.amzSellerZone{ margin-top:2px; font-size: 12px; color: var(--muted); font-weight: 800; }
+.amzSellerBtn{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: #fff;
+  cursor:pointer;
+  font-weight: 1000;
+  font-size: 12px;
+  color: var(--text);
+}
+.amzSellerBtn:hover{ box-shadow: 0 10px 18px rgba(15,23,42,.08); }
+
+`;
+
+return (
+  <div className="amzPage">
+    <style>{amzCss}</style>
+
+    <div className="amzWrap">
+      {/* Top bar */}
+      <div className="amzTopbar">
+        <div className="amzTopRow">
+          <button onClick={() => navigate(-1)} className="amzBack" aria-label="Volver">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
 
-          <div style={{ minWidth: 0 }}>
-            <div style={s.brandTitle}>Lokaly</div>
-            <div style={s.brandSub}>
+          <div className="amzBrand">
+            <div className="amzBrandTitle">Lokaly</div>
+            <div className="amzBrandSub">
               {data.seller.clusterName ? (
                 <>
-                  {data.seller.clusterName}{" "}
-                  <span style={{ opacity: 0.55 }}>· {data.seller.name}</span>
+                  {data.seller.clusterName} <span style={{ opacity: 0.75 }}>· {data.seller.name}</span>
                 </>
               ) : (
-                <span style={{ opacity: 0.75 }}>{data.seller.name}</span>
+                <span style={{ opacity: 0.9 }}>{data.seller.name}</span>
               )}
             </div>
           </div>
 
-          <div style={s.headerRight}>
+          <div className="amzTopActions">
             {data.seller.slug ? (
               <button
                 onClick={() => navigate(`/catalog/${data.seller.slug}`)}
-                style={s.iconBtn}
+                className="amzIcon"
                 aria-label="Ver catálogo"
                 title="Ver catálogo"
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#111827"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ display: "block" }}
-                >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 9l1-5h16l1 5" />
                   <path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
                   <path d="M9 21V12h6v9" />
@@ -1261,202 +1419,180 @@ function openOrderModal() {
               </button>
             ) : null}
 
-            <button onClick={copyLink} style={s.iconBtn} aria-label="Copiar link" title="Copiar link">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#111827"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ display: "block" }}
-              >
+            <button onClick={copyLink} className="amzIcon" aria-label="Copiar link" title="Copiar link">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
             </button>
           </div>
-        </header>
-
-        {/* Product card */}
-        <section style={s.card}>
-          {gallery.length > 0 ? (
-            <ProductImageCarousel images={gallery} alt={data.name} isMobile={isMobile} />
-          ) : (
-            <div style={{ ...s.noImg, height: isMobile ? 280 : 360 }}>Sin imagen</div>
-          )}
-
-          <div style={{ ...s.cardBody, padding: isMobile ? 12 : 14 }}>
-            <div style={s.titleRow}>
-              <h1 style={{ ...s.title, fontSize: isMobile ? 18 : 20 }}>{data.name}</h1>
-              {data.featured && <span style={s.pillFeatured}>Destacado ✨</span>}
-              <span style={isOutOfStock ? s.pillOut : s.pillAvailable}>{stockLabel}</span>
-            </div>
-
-            <div style={{ ...s.price, fontSize: isMobile ? 16 : 18 }}>{moneyMXN(data.price)}</div>
-
-            {data.description ? (
-              <p style={s.desc}>{data.description}</p>
-            ) : (
-              <p style={s.descMuted}>Este producto no tiene descripción.</p>
-            )}
-
-<div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-  <button
-    onClick={() => {
-      // opcional: track "REPORT_OPEN"
-      try {
-        trackEvent({
-          name: "REPORT_OPEN",
-          domain: "report",
-          visitorId: getVisitorId(),
-          catalogId: data?.seller?.slug || data?.seller?.id || "unknown",
-          productId: data?.id,
-          path: window.location.pathname,
-        });
-      } catch {}
-      setReportOpen(true);
-    }}
-    style={{
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid #E5E7EB",
-      background: "#fff",
-      cursor: "pointer",
-      fontWeight: 900,
-      fontSize: 12,
-      color: "#111827",
-    }}
-  >
-    🚩 Reportar
-  </button>
-</div>
-
-            {/* Sticky CTA */}
-            <div style={s.sellerCTA}>
-              <button onClick={copyLink} style={s.bottomGhost}>
-                Copiar link
-              </button>
-
-<button
-  onClick={() => {
-    // ✅ Analytics: WHATSAPP_CLICK (product page)
-    try {
-      const visitorId = getVisitorId();
-      const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
-
-      trackEvent({
-        name: "WHATSAPP_CLICK",
-        domain: "whatsapp",
-        visitorId,
-        catalogId,
-        productId: data?.id,
-        path: window.location.pathname,
-        props: {
-          source: "product_cta",
-          sellerName: data?.seller?.name,
-          sellerSlug: data?.seller?.slug,
-          productName: data?.name,
-          price: data?.price,
-        },
-      });
-    } catch {}
-
-    openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
-  }}
-  style={s.bottomWhats}
->
-  WhatsApp
-</button>
-
-              <button
-                onClick={openOrderModal}
-                style={{ ...s.bottomBlack, ...(isOutOfStock ? s.bottomDisabled : null) }}
-                disabled={isOutOfStock}
-                title={isOutOfStock ? "Producto agotado" : "Enviar solicitud al vendedor"}
-              >
-                {isOutOfStock ? "Agotado" : "Comprar"}
-              </button>
-            </div>
-
-            {/* Seller strip */}
-            <div style={s.sellerStrip}>
-              <div style={{ minWidth: 0 }}>
-                <div style={s.sellerName}>{data.seller.name}</div>
-                <div style={s.sellerZone}>
-                  {data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}
-                </div>
-              </div>
-
-              <button
-                onClick={() => navigate(`/catalog/${data.seller.slug}`)}
-                style={s.btnGhost}
-                disabled={!data.seller.slug}
-                title={!data.seller.slug ? "Catálogo no disponible" : "Ver catálogo"}
-              >
-                Ver catálogo del vendedor
-              </button>
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
 
-      {/* ✅ Pro sheet */}
-      <OrderSheet
-        open={orderOpen}
-        onClose={() => setOrderOpen(false)}
-        productName={data.name}
-        availableQty={available}
-        buyerName={buyerName}
-        setBuyerName={setBuyerName}
-        buyerWhatsapp={buyerWhatsapp}
-        setBuyerWhatsapp={setBuyerWhatsapp}
-        qty={qty}
-        setQty={setQty}
-        note={note}
-        setNote={setNote}
-        submitting={submitting}
-        canSubmit={canSubmit}
-        onSubmit={submitOrderRequest}
-        orderOk={orderOk}
-          onOpenWhats={() => {
-    // ✅ Analytics: WHATSAPP_CLICK (after order success)
-    try {
-      const visitorId = getVisitorId();
-      const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+      {/* Product */}
+      <section className="amzCard">
+        {gallery.length > 0 ? (
+          <ProductImageCarousel images={gallery} alt={data.name} isMobile={isMobile} />
+        ) : (
+          <div style={{ ...s.noImg, height: isMobile ? 280 : 360 }}>Sin imagen</div>
+        )}
 
-      trackEvent({
-        name: "WHATSAPP_CLICK",
-        domain: "whatsapp",
-        visitorId,
-        catalogId,
-        productId: data?.id,
-        path: window.location.pathname,
-        props: {
-          source: "order_success",
-          sellerName: data?.seller?.name,
-          sellerSlug: data?.seller?.slug,
-          productName: data?.name,
-          price: data?.price,
-          orderId: orderOk?.id ?? null,
-        },
-      });
-    } catch {}
+        <div className="amzBody">
+          <div className="amzTitleRow">
+            <h1 className="amzH1" style={{ fontSize: isMobile ? 18 : 20 }}>{data.name}</h1>
+          </div>
 
-    openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
-  }}
-      />
+          <div className="amzPills">
+            {data.featured && <span className="amzPill amzPillFeatured">⭐ Destacado</span>}
+            <span className={`amzPill ${isOutOfStock ? "amzPillOut" : "amzPillGreen"}`}>{stockLabel}</span>
+            <span className="amzPill">📍 Local</span>
+          </div>
 
-<ReportModal
-  open={reportOpen}
-  onClose={() => setReportOpen(false)}
-  productId={data.id}
-  catalogSlug={data.seller.slug || null}
-/>      
+          <div className="amzPrice" style={{ fontSize: isMobile ? 16 : 18 }}>{moneyMXN(data.price)}</div>
+
+          {data.description ? (
+            <p className="amzDesc">{data.description}</p>
+          ) : (
+            <p className="amzDescMuted">Este producto no tiene descripción.</p>
+          )}
+
+          <div className="amzReportRow">
+            <button
+              onClick={() => {
+                try {
+                  trackEvent({
+                    name: "REPORT_OPEN",
+                    domain: "report",
+                    visitorId: getVisitorId(),
+                    catalogId: data?.seller?.slug || data?.seller?.id || "unknown",
+                    productId: data?.id,
+                    path: window.location.pathname,
+                  });
+                } catch {}
+                setReportOpen(true);
+              }}
+              className="amzReportBtn"
+            >
+              🚩 Reportar
+            </button>
+          </div>
+
+          {/* CTA */}
+          <div className="amzCta">
+            <button onClick={copyLink} className="amzBtnGhost">Copiar link</button>
+
+            <button
+              onClick={() => {
+                try {
+                  const visitorId = getVisitorId();
+                  const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+                  trackEvent({
+                    name: "WHATSAPP_CLICK",
+                    domain: "whatsapp",
+                    visitorId,
+                    catalogId,
+                    productId: data?.id,
+                    path: window.location.pathname,
+                    props: {
+                      source: "product_cta",
+                      sellerName: data?.seller?.name,
+                      sellerSlug: data?.seller?.slug,
+                      productName: data?.name,
+                      price: data?.price,
+                    },
+                  });
+                } catch {}
+                openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
+              }}
+              className="amzBtnWhats"
+            >
+              WhatsApp
+            </button>
+
+            <button
+              onClick={openOrderModal}
+              className={`amzBtnPrimary ${isOutOfStock ? "amzBtnDisabled" : ""}`}
+              disabled={isOutOfStock}
+              title={isOutOfStock ? "Producto agotado" : "Enviar solicitud al vendedor"}
+            >
+              {isOutOfStock ? "Agotado" : "Comprar"}
+            </button>
+          </div>
+
+          {/* Seller */}
+          <div className="amzSeller">
+            <div style={{ minWidth: 0 }}>
+              <div className="amzSellerName" style={clamp(1)}>{data.seller.name}</div>
+              <div className="amzSellerZone" style={clamp(1)}>
+                {data.seller.clusterName ? data.seller.clusterName : "Vendedor en Lokaly"}
+              </div>
+            </div>
+
+            <button
+              onClick={() => navigate(`/catalog/${data.seller.slug}`)}
+              className="amzSellerBtn"
+              disabled={!data.seller.slug}
+              title={!data.seller.slug ? "Catálogo no disponible" : "Ver catálogo"}
+            >
+              Ver catálogo del vendedor
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
-  );
+
+    {/* ✅ Pro sheet + report modal igual */}
+    <OrderSheet
+      open={orderOpen}
+      onClose={() => setOrderOpen(false)}
+      productName={data.name}
+      availableQty={available}
+      buyerName={buyerName}
+      setBuyerName={setBuyerName}
+      buyerWhatsapp={buyerWhatsapp}
+      setBuyerWhatsapp={setBuyerWhatsapp}
+      qty={qty}
+      setQty={setQty}
+      note={note}
+      setNote={setNote}
+      submitting={submitting}
+      canSubmit={canSubmit}
+      onSubmit={submitOrderRequest}
+      orderOk={orderOk}
+      onOpenWhats={() => {
+        try {
+          const visitorId = getVisitorId();
+          const catalogId = data?.seller?.id || data?.seller?.slug || "unknown";
+          trackEvent({
+            name: "WHATSAPP_CLICK",
+            domain: "whatsapp",
+            visitorId,
+            catalogId,
+            productId: data?.id,
+            path: window.location.pathname,
+            props: {
+              source: "order_success",
+              sellerName: data?.seller?.name,
+              sellerSlug: data?.seller?.slug,
+              productName: data?.name,
+              price: data?.price,
+              orderId: orderOk?.id ?? null,
+            },
+          });
+        } catch {}
+        openWhatsApp(data.seller.whatsapp ?? "", whatsappMessage);
+      }}
+    />
+
+    <ReportModal
+      open={reportOpen}
+      onClose={() => setReportOpen(false)}
+      productId={data.id}
+      catalogSlug={data.seller.slug || null}
+    />
+  </div>
+);
+    
 }
 
 /* =======================
