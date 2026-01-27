@@ -367,11 +367,17 @@ export default function LandingPage() {
     </div>
 
     {/* Links */}
-    <div className="lp__footerLinks">
-      <Link to="terms.html">Términos</Link>
-      <Link to="privacy.html">Privacidad</Link>
-      <a href="mailto:soporte@lokaly.site">Soporte</a>
-    </div>
+<div className="lp__footerLinks">
+  <a href="/terms.html" target="_blank" rel="noopener noreferrer">
+    Términos
+  </a>
+  <a href="/privacy.html" target="_blank" rel="noopener noreferrer">
+    Privacidad
+  </a>
+  <a href="mailto:soporte@lokaly.site">
+    Soporte
+  </a>
+</div>
   </div>
 </footer>
       </main>
