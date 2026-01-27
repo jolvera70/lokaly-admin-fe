@@ -48,6 +48,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
 <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
   <NavItem label="Dashboard" to="/admin/dashboard" exact />
+  <NavItem label="Reportes Page" to="/admin/reportes" exact />
 
   <div style={{ height: 10 }} />
 

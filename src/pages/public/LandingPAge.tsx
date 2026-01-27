@@ -349,20 +349,31 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Footer mini */}
-        <footer className="lp__footer" id="contact">
-          <div className="lp__footerInner">
-            <div>
-              <div className="lp__footerBrand">Lokaly</div>
-              <div className="lp__footerMuted">Soporte por WhatsApp</div>
-            </div>
-            <div className="lp__footerLinks">
-              <Link to="/terminos">Términos</Link>
-              <Link to="/privacidad">Privacidad</Link>
-              <Link to="/soporte">Soporte</Link>
-            </div>
-          </div>
-        </footer>
+{/* Footer */}
+<footer className="lp__footer" id="contact">
+  <div className="lp__footerInner">
+    {/* Brand */}
+    <div className="lp__footerLeft">
+      <div className="lp__footerBrand">Lokaly</div>
+
+      <a
+        className="lp__footerWhatsapp"
+        href="https://wa.me/528182082264text=Hola%20necesito%20soporte%20con%20Lokaly"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Soporte por WhatsApp
+      </a>
+    </div>
+
+    {/* Links */}
+    <div className="lp__footerLinks">
+      <Link to="terms.html">Términos</Link>
+      <Link to="privacy.html">Privacidad</Link>
+      <a href="mailto:soporte@lokaly.site">Soporte</a>
+    </div>
+  </div>
+</footer>
       </main>
     </div>
   );

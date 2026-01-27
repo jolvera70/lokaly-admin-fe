@@ -63,19 +63,6 @@ export function resolveImageUrl(rawUrl?: string | null): string | undefined {
   return `${origin}${path}`;
 }
 
-function cleanPhone(phone: string) {
-  return (phone || "").replace(/[^\d]/g, "");
-}
-
-function openWhatsApp(phone: string, message: string) {
-  const p = cleanPhone(phone);
-  if (!p) {
-    alert("Este vendedor no tiene WhatsApp configurado.");
-    return;
-  }
-  const url = `https://wa.me/${p}?text=${encodeURIComponent(message)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
 function moneyMXN(value: number) {
   return `$${(value ?? 0).toLocaleString("es-MX")} MXN`;
@@ -431,6 +418,8 @@ export function PublicCatalogPage() {
   const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [sort, setSort] = useState<SortKey>("FEATURED");
 
+  const [copied, setCopied] = useState(false);
+
   const loadCatalog = useCallback(async () => {
     if (!slug) return;
 
@@ -495,42 +484,16 @@ export function PublicCatalogPage() {
 
   const seller = data?.seller;
 
-  async function copyCatalogLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast("Link copiado ✅");
-    } catch {
-      alert("No se pudo copiar. Copia manual: " + window.location.href);
-    }
-  }
-
-const openWhatsAppGeneral = () => {
-  if (!seller?.whatsapp) return alert("Este vendedor no tiene WhatsApp configurado.");
-
-  // ✅ Analytics: WHATSAPP_CLICK (catalog header)
+const copyCatalogLink = async () => {
   try {
-    const visitorId = getVisitorId();
-    const catalogId = seller?.id || slug || "unknown";
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
 
-    trackEvent({
-      name: "WHATSAPP_CLICK",
-      domain: "whatsapp",
-      visitorId,
-      catalogId,
-      path: window.location.pathname,
-      props: {
-        source: "catalog_header",
-        slug,
-        sellerName: seller?.name,
-        productsCount: data?.products?.length ?? 0,
-      },
-    });
-  } catch {}
-
-  openWhatsApp(
-    seller.whatsapp,
-    `Hola! Vi tu catálogo (${window.location.href}) y me interesa un producto.`
-  );
+    // vuelve a estado normal después de 2s
+    setTimeout(() => setCopied(false), 2000);
+  } catch (e) {
+    alert("No se pudo copiar el enlace");
+  }
 };
 
   const filteredProducts = useMemo(() => {
@@ -595,15 +558,29 @@ const openWhatsAppGeneral = () => {
             </div>
 
             <div style={s.headerRight}>
-              <button onClick={copyCatalogLink} style={s.iconBtn} aria-label="Copiar link">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              </button>
-              <button onClick={openWhatsAppGeneral} style={s.iconBtn} aria-label="WhatsApp">
-                💬
-              </button>
+<button
+  onClick={copyCatalogLink}
+  style={{
+    ...s.iconBtn,
+    background: copied ? "rgba(34,197,94,0.12)" : s.iconBtn.background,
+    borderColor: copied ? "rgba(34,197,94,0.35)" : s.iconBtn.borderColor,
+  }}
+  aria-label="Copiar link del catálogo"
+  title="Copiar link del catálogo"
+>
+  {copied ? (
+    // ✅ check cuando se copia
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  ) : (
+    // 📋 icono copiar
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )}
+</button>
             </div>
           </div>
 
@@ -733,32 +710,7 @@ const openWhatsAppGeneral = () => {
   );
 }
 
-/* =======================
-   Tiny toast (sin libs)
-======================= */
 
-let toastTimer: ReturnType<typeof setTimeout> | null = null;
-
-function toast(msg: string) {
-  const elId = "lokaly-toast";
-  let el = document.getElementById(elId);
-
-  if (!el) {
-    el = document.createElement("div");
-    el.id = elId;
-    document.body.appendChild(el);
-  }
-
-  el.textContent = msg;
-  Object.assign(el.style, s.toast);
-  el.style.opacity = "1";
-
-  if (toastTimer) clearTimeout(toastTimer);
-
-  toastTimer = setTimeout(() => {
-    if (el) el.style.opacity = "0";
-  }, 1100);
-}
 
 /* =======================
    Styles (app-like light)

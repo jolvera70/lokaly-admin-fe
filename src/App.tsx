@@ -46,6 +46,7 @@ import SellerStatsPage from "./pages/seller/SellerStatsPage";
 import SellerSettingsPage from "./pages/seller/SellerSettingsPage";
 import SellerOrdersPage from "./pages/seller/SellerOrdersPage";
 import Dashboard from "./pages/Dashboard";
+import ReportsPage from "./pages/ReportsPage";
 
 type AuthState = {
   token: string;
@@ -99,6 +100,7 @@ function AdminShell({
   // ✅ Seller panel: requiere seller=true (o admin)
   if (isSellerArea && !canAccessSellerPanel(role, auth.isSeller)) {
     return <Navigate to="/admin/dashboard" replace />;
+    
   }
 
   // ✅ Admin panel: solo admins
@@ -177,6 +179,7 @@ function App() {
         {/* 🔒 Rutas protegidas */}
         <Route element={<AdminShell auth={auth} onLogout={handleLogout} />}>
           <Route path="/admin/dashboard"  element={<Dashboard />} />
+          <Route path="/admin/reportes" element={<ReportsPage />} />
 
           {/* Admin */}
           <Route path="/admin/colonies" element={<ColoniesSelectorPage />} />
