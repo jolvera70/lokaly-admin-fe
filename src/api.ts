@@ -924,3 +924,22 @@ export async function confirmCheckout(orderId: string, sessionId: string): Promi
   }
   return (await res.json()) as CheckoutOrderDto;
 }
+
+export async function activatePilotPlan(body: { planKey: "PILOT" }) {
+  const res = await fetch("/api/public/v1/catalog/pilot/activate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    const err: any = new Error("PILOT_ACTIVATE_FAILED");
+    err.status = res.status;
+    err.body = txt;
+    throw err;
+  }
+
+  return res.json().catch(() => ({}));
+}

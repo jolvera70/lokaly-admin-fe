@@ -5,7 +5,7 @@ import "../LandingPage.css";
 
 import logoMark from "../../assets/brand/lokaly-mark.svg";
 import { usePublishGuard } from "../../hooks/usePublishGuard";
-import { fetchCatalogPlans, createCatalogCheckout } from "../../api";
+import { fetchCatalogPlans, createCatalogCheckout, activatePilotPlan, publishCatalogProduct } from "../../api";
 
 type ProductDraft = {
   phoneE164: string;
@@ -17,7 +17,7 @@ type ProductDraft = {
   description: string;
 };
 
-type PlanKey = "ONE" | "PACK3" | "PACK5" | "PACK10";
+type PlanKey = "PILOT" |"ONE" | "PACK3" | "PACK5" | "PACK10";
 
 /** ✅ viene así desde ProductFormPage: navigate("/publicar/pago", { state: { productId, draft } }) */
 type LocationState = {
@@ -39,13 +39,26 @@ type Plan = {
   daysValid?: number;
   highlight?: "MOST_SOLD" | "RECOMMENDED";
   blurb: string;
-  bg?: "white" | "blueSoft";
+  bg?: "white" | "blueSoft" | "amberSoft";
 };
 
 const BASE_PRICE = 16;
 
+
+
 // Fallback local (si el BE falla o todavía no tienes /plans)
 const FALLBACK_PLANS: Plan[] = [
+  {
+    key: "PILOT",
+    title: "Piloto (sin costo)",
+    subtitle: "5 publicaciones · 30 días",
+    price: 0,
+    credits: 5,
+    daysValid: 21,
+    highlight: "RECOMMENDED",
+    blurb: "Acceso de piloto: publica tus productos y valida ventas sin pagar. Cupo limitado.",
+    bg: "amberSoft",
+  },  
   {
     key: "ONE",
     title: "1 publicación",
@@ -90,6 +103,8 @@ const FALLBACK_PLANS: Plan[] = [
   },
 ];
 
+const PILOT_PLAN: Plan = FALLBACK_PLANS[0]; // el primero es PILOT
+
 function savingsText(plan: Plan) {
   if (plan.credits <= 1) return "";
   const regular = plan.credits * BASE_PRICE;
@@ -109,7 +124,7 @@ function normalizePlans(raw: any): Plan[] | null {
     const list = Array.isArray(raw) ? raw : Array.isArray(raw?.plans) ? raw.plans : null;
     if (!list) return null;
 
-    const mapped: Plan[] = list
+    let mapped: Plan[] = list
       .map((p: any) => {
         const key = String(p.key ?? p.planKey ?? "").toUpperCase() as PlanKey;
         if (!key) return null;
@@ -119,16 +134,27 @@ function normalizePlans(raw: any): Plan[] | null {
         const daysValid = p.daysValid != null ? Number(p.daysValid) : undefined;
 
         // si tu BE trae labels, usamos eso; si no, armamos defaults
-        const title =
-          p.title ??
-          (key === "ONE" ? "1 publicación" : key === "PACK3" ? "Paquete 3" : key === "PACK5" ? "Paquete 5" : "Paquete 10");
+const title =
+  p.title ??
+  (key === "PILOT" ? "Piloto (sin costo)"
+  : key === "ONE" ? "1 publicación"
+  : key === "PACK3" ? "Paquete 3"
+  : key === "PACK5" ? "Paquete 5"
+  : "Paquete 10");
 
-        const subtitle = p.subtitle ?? (credits === 1 ? `${daysValid ?? 30} días activo` : `${credits} publicaciones`);
+const subtitle =
+  p.subtitle ??
+  (key === "PILOT"
+    ? `${credits} publicaciones · ${daysValid ?? 21} días`
+    : credits === 1
+      ? `${daysValid ?? 30} días activo`
+      : `${credits} publicaciones`);
         const blurb = p.blurb ?? "Publica tus productos y comparte un solo link.";
         const highlight = (p.highlight as any) ?? undefined;
         const bg = (p.bg as any) ?? (key === "PACK5" || key === "PACK10" ? "blueSoft" : "white");
 
-        if (!credits || !price) return null;
+        if (!credits) return null;
+        if (price < 0 || Number.isNaN(price)) return null;
 
         return {
           key,
@@ -146,9 +172,16 @@ function normalizePlans(raw: any): Plan[] | null {
 
     // Validación mínima: que existan planes
     if (!mapped.length) return null;
+    mapped = mapped.map((p) =>
+  p.key === "PILOT"
+    ? { ...p, bg: "amberSoft", highlight: "RECOMMENDED" }
+    : p
+);
+
+    const ORDER: PlanKey[] = ["PILOT", "ONE", "PACK3", "PACK5", "PACK10"];
 
     // Opcional: ordenar por credits
-    mapped.sort((a, b) => a.credits - b.credits);
+    mapped.sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
     return mapped;
   } catch {
     return null;
@@ -174,7 +207,7 @@ export default function PaymentPage() {
   const [plansErr, setPlansErr] = useState<string | null>(null);
 
   // selección de plan
-  const [planKey, setPlanKey] = useState<PlanKey>("PACK10");
+  const [planKey, setPlanKey] = useState<PlanKey>("PILOT");
 
   // loading del flujo de pago
   const [loading, setLoading] = useState(false);
@@ -209,16 +242,20 @@ export default function PaymentPage() {
 
         if (!alive) return;
 
-        if (normalized && normalized.length) {
-          setPlans(normalized);
+if (normalized && normalized.length) {
+  // ✅ asegura PILOT aunque el BE no lo mande
+  const withPilot = normalized.some(p => p.key === "PILOT")
+    ? normalized
+    : [PILOT_PLAN, ...normalized];
 
-          // si el planKey actual no existe, set al último (el de más créditos)
-          const exists = normalized.some((p) => p.key === planKey);
-          if (!exists) setPlanKey(normalized[normalized.length - 1].key);
-        } else {
-          // fallback silencioso
-          setPlans(FALLBACK_PLANS);
-        }
+  setPlans(withPilot);
+
+  const exists = withPilot.some((p) => p.key === planKey);
+  if (!exists) setPlanKey("PILOT");
+} else {
+  setPlans(FALLBACK_PLANS);
+  setPlanKey("PILOT");
+}
       } catch (e: any) {
         if (!alive) return;
         setPlans(FALLBACK_PLANS);
@@ -255,6 +292,35 @@ async function onPay() {
   setPayErr(null);
 
   try {
+
+        if (planKey === "PILOT") {
+      await activatePilotPlan({ planKey: "PILOT" });
+        // ✅ PUBLICAR el producto (igual que después del pago)
+      await publishCatalogProduct(productId);
+
+      // guarda contexto mínimo si lo necesitas para continuar
+      localStorage.setItem(
+        "lokaly_pending_payment_v1",
+        JSON.stringify({
+          productId,
+          planKey,
+          orderId: "PILOT",
+          title: draft.title,
+          phoneE164: draft.phoneE164,
+          phoneLocal: draft.phoneLocal,
+          amount: 0,
+          currency: "MXN",
+          credits: selectedPlan.credits,
+          daysValid: selectedPlan.daysValid ?? 21,
+          createdAt: Date.now(),
+        })
+      );
+
+      // ✅ manda a success / publicar (elige el route que ya uses)
+      navigate("/publicar/mis-productos", { replace: true });
+      return;
+    }
+
     // 1) crear checkout (order PENDING + checkoutUrl)
     const order = await createCatalogCheckout(planKey);
 
@@ -362,15 +428,52 @@ localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
             <div style={{ marginTop: 14, display: "grid", gap: 10, opacity: plansLoading ? 0.85 : 1 }}>
               {plans.map((p) => {
                 const isActive = p.key === planKey;
-                const isBlue = p.bg === "blueSoft";
+                const displayTitle = p.key === "PILOT" ? "Piloto (sin costo)" : p.title;
+                const bgStyle =
+  p.bg === "blueSoft"
+    ? {
+        cardBg: "rgba(37,99,235,0.06)",
+        badgeBg: "rgba(37,99,235,0.14)",
+        badgeBorder: "1px solid rgba(37,99,235,0.20)",
+      }
+    : p.bg === "amberSoft"
+    ? {
+        cardBg: "rgba(245,158,11,0.08)",
+        badgeBg: "rgba(245,158,11,0.18)",
+        badgeBorder: "1px solid rgba(245,158,11,0.30)",
+      }
+    : {
+        cardBg: "#fff",
+        badgeBg: "rgba(15,23,42,0.06)",
+        badgeBorder: "1px solid rgba(15,23,42,0.12)",
+      };
 
-                const badge =
-                  p.highlight === "MOST_SOLD"
-                    ? "⭐ Más vendido"
-                    : p.highlight === "RECOMMENDED"
-                    ? "Recomendado"
-                    : "";
+const badge =
+  p.key === "PILOT"
+    ? "🚀 Piloto"
+    : p.key === "PACK5"
+    ? "⭐ Más vendido"
+    : p.key === "PACK10"
+    ? "Recomendado"
+    : "";
 
+    const badgeStyle =
+  p.key === "PILOT"
+    ? {
+        background: "rgba(245,158,11,0.18)",
+        border: "1px solid rgba(245,158,11,0.35)",
+      }
+    : p.key === "PACK5"
+    ? {
+        background: "rgba(37,99,235,0.14)",
+        border: "1px solid rgba(37,99,235,0.25)",
+      }
+    : p.key === "PACK10"
+    ? {
+        background: "rgba(15,23,42,0.08)",
+        border: "1px solid rgba(15,23,42,0.18)",
+      }
+    : {};
                 return (
                   <button
                     key={p.key}
@@ -381,7 +484,7 @@ localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
                       textAlign: "left",
                       borderRadius: 18,
                       border: isActive ? "2px solid rgba(37,99,235,0.55)" : "1px solid rgba(15,23,42,0.10)",
-                      background: isBlue ? "rgba(37,99,235,0.06)" : "#fff",
+                      background: bgStyle.cardBg,
                       padding: 14,
                       cursor: loading ? "not-allowed" : "pointer",
                       boxShadow: "0 12px 26px rgba(15,23,42,0.05)",
@@ -392,13 +495,11 @@ localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
                     {badge ? (
                       <div
                         style={{
+                          ...badgeStyle,
                           fontSize: 12,
                           fontWeight: 950,
                           padding: "5px 9px",
                           borderRadius: 999,
-                          background: "rgba(37,99,235,0.14)",
-                          border: "1px solid rgba(37,99,235,0.20)",
-                          color: "rgba(15,23,42,0.80)",
                           whiteSpace: "nowrap",
                           display: "inline-block",
                           marginBottom: 8,
@@ -410,18 +511,25 @@ localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
 
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
                       <div style={{ fontWeight: 950, fontSize: 15, color: "#0f172a" }}>
-                        {p.title} — <span style={{ fontSize: 18 }}>{formatMxMoney(p.price)}</span>
+                        {displayTitle} — <span style={{ fontSize: 18 }}>{formatMxMoney(p.price)}</span>
                       </div>
                       <div style={{ fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.60)" }}>
                         {p.credits} publicaciones
                       </div>
                     </div>
 
-                    {savingsText(p) ? (
-                      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: "rgba(15,23,42,0.62)" }}>
-                        {savingsText(p)}
-                      </div>
-                    ) : null}
+{p.key !== "PILOT" && savingsText(p) ? (
+  <div
+    style={{
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: 900,
+      color: "rgba(15,23,42,0.62)",
+    }}
+  >
+    {savingsText(p)}
+  </div>
+) : null}
 
                     {p.key === "PACK5" ? (
                       <div
@@ -474,12 +582,18 @@ localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
                 cursor: loading || plansLoading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "Procesando..." : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
+              {loading
+  ? "Procesando..."
+  : planKey === "PILOT"
+  ? "Activar piloto y publicar"
+  : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
             </button>
 
-            <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
-              Pago seguro. No cobramos comisión por venta.
-            </div>
+<div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
+  {planKey === "PILOT"
+    ? "Piloto activo. No se te pedirá tarjeta."
+    : "Pago seguro. No cobramos comisión por venta."}
+</div>
 
             <div style={{ marginTop: 8, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
               *Precio inicial por lanzamiento. Próximamente sube a $19.
