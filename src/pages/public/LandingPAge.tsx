@@ -271,7 +271,7 @@ export default function LandingPage() {
                 Administrar mis productos
               </button>
 
-              <button className="lp__btn lp__btn--ghost" onClick={() => navigate("https://lokaly.site/catalog/mi-catalogo-1dm0gqx")}>
+              <button className="lp__btn lp__btn--ghost" onClick={() => navigate("https://lokaly.site/app/catalog/mi-catalogo-1dm0gqx")}>
                 Ver ejemplo de catalogo
               </button>
             </div>
