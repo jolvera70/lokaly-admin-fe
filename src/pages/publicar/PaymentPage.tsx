@@ -17,7 +17,7 @@ type ProductDraft = {
   description: string;
 };
 
-type PlanKey = "PILOT" |"ONE" | "PACK3" | "PACK5" | "PACK10";
+type PlanKey = "PILOT" | "ONE" | "PACK3" | "PACK5" | "PACK10";
 
 /** ✅ viene así desde ProductFormPage: navigate("/publicar/pago", { state: { productId, draft } }) */
 type LocationState = {
@@ -58,7 +58,7 @@ const FALLBACK_PLANS: Plan[] = [
     highlight: "RECOMMENDED",
     blurb: "Acceso de piloto: publica tus productos y valida ventas sin pagar. Cupo limitado.",
     bg: "amberSoft",
-  },  
+  },
   {
     key: "ONE",
     title: "1 publicación",
@@ -134,21 +134,21 @@ function normalizePlans(raw: any): Plan[] | null {
         const daysValid = p.daysValid != null ? Number(p.daysValid) : undefined;
 
         // si tu BE trae labels, usamos eso; si no, armamos defaults
-const title =
-  p.title ??
-  (key === "PILOT" ? "Piloto (sin costo)"
-  : key === "ONE" ? "1 publicación"
-  : key === "PACK3" ? "Paquete 3"
-  : key === "PACK5" ? "Paquete 5"
-  : "Paquete 10");
+        const title =
+          p.title ??
+          (key === "PILOT" ? "Piloto (sin costo)"
+            : key === "ONE" ? "1 publicación"
+              : key === "PACK3" ? "Paquete 3"
+                : key === "PACK5" ? "Paquete 5"
+                  : "Paquete 10");
 
-const subtitle =
-  p.subtitle ??
-  (key === "PILOT"
-    ? `${credits} publicaciones · ${daysValid ?? 21} días`
-    : credits === 1
-      ? `${daysValid ?? 30} días activo`
-      : `${credits} publicaciones`);
+        const subtitle =
+          p.subtitle ??
+          (key === "PILOT"
+            ? `${credits} publicaciones · ${daysValid ?? 21} días`
+            : credits === 1
+              ? `${daysValid ?? 30} días activo`
+              : `${credits} publicaciones`);
         const blurb = p.blurb ?? "Publica tus productos y comparte un solo link.";
         const highlight = (p.highlight as any) ?? undefined;
         const bg = (p.bg as any) ?? (key === "PACK5" || key === "PACK10" ? "blueSoft" : "white");
@@ -173,10 +173,10 @@ const subtitle =
     // Validación mínima: que existan planes
     if (!mapped.length) return null;
     mapped = mapped.map((p) =>
-  p.key === "PILOT"
-    ? { ...p, bg: "amberSoft", highlight: "RECOMMENDED" }
-    : p
-);
+      p.key === "PILOT"
+        ? { ...p, bg: "amberSoft", highlight: "RECOMMENDED" }
+        : p
+    );
 
     const ORDER: PlanKey[] = ["PILOT", "ONE", "PACK3", "PACK5", "PACK10"];
 
@@ -242,20 +242,20 @@ export default function PaymentPage() {
 
         if (!alive) return;
 
-if (normalized && normalized.length) {
-  // ✅ asegura PILOT aunque el BE no lo mande
-  const withPilot = normalized.some(p => p.key === "PILOT")
-    ? normalized
-    : [PILOT_PLAN, ...normalized];
+        if (normalized && normalized.length) {
+          // ✅ asegura PILOT aunque el BE no lo mande
+          const withPilot = normalized.some(p => p.key === "PILOT")
+            ? normalized
+            : [PILOT_PLAN, ...normalized];
 
-  setPlans(withPilot);
+          setPlans(withPilot);
 
-  const exists = withPilot.some((p) => p.key === planKey);
-  if (!exists) setPlanKey("PILOT");
-} else {
-  setPlans(FALLBACK_PLANS);
-  setPlanKey("PILOT");
-}
+          const exists = withPilot.some((p) => p.key === planKey);
+          if (!exists) setPlanKey("PILOT");
+        } else {
+          setPlans(FALLBACK_PLANS);
+          setPlanKey("PILOT");
+        }
       } catch (e: any) {
         if (!alive) return;
         setPlans(FALLBACK_PLANS);
@@ -284,86 +284,86 @@ if (normalized && normalized.length) {
 
   const primaryPreview = draft?.images?.[safePrimaryIndex]?.previewUrl ?? null;
 
-async function onPay() {
-  if (!draft || !productId) return;
-  if (!selectedPlan) return;
+  async function onPay() {
+    if (!draft || !productId) return;
+    if (!selectedPlan) return;
 
-  setLoading(true);
-  setPayErr(null);
+    setLoading(true);
+    setPayErr(null);
 
-  try {
+    try {
 
-        if (planKey === "PILOT") {
-      await activatePilotPlan({ planKey: "PILOT" });
+      if (planKey === "PILOT") {
+        await activatePilotPlan({ planKey: "PILOT" });
         // ✅ PUBLICAR el producto (igual que después del pago)
-      await publishCatalogProduct(productId);
+        await publishCatalogProduct(productId);
 
-      // guarda contexto mínimo si lo necesitas para continuar
-      localStorage.setItem(
-        "lokaly_pending_payment_v1",
-        JSON.stringify({
-          productId,
-          planKey,
-          orderId: "PILOT",
-          title: draft.title,
-          phoneE164: draft.phoneE164,
-          phoneLocal: draft.phoneLocal,
-          amount: 0,
-          currency: "MXN",
-          credits: selectedPlan.credits,
-          daysValid: selectedPlan.daysValid ?? 21,
-          createdAt: Date.now(),
-        })
-      );
+        // guarda contexto mínimo si lo necesitas para continuar
+        localStorage.setItem(
+          "lokaly_pending_payment_v1",
+          JSON.stringify({
+            productId,
+            planKey,
+            orderId: "PILOT",
+            title: draft.title,
+            phoneE164: draft.phoneE164,
+            phoneLocal: draft.phoneLocal,
+            amount: 0,
+            currency: "MXN",
+            credits: selectedPlan.credits,
+            daysValid: selectedPlan.daysValid ?? 21,
+            createdAt: Date.now(),
+          })
+        );
 
-      // ✅ manda a success / publicar (elige el route que ya uses)
-      navigate("/publicar/mis-productos", { replace: true });
-      return;
+        // ✅ manda a success / publicar (elige el route que ya uses)
+        navigate("/publicar/mis-productos", { replace: true });
+        return;
+      }
+
+      // 1) crear checkout (order PENDING + checkoutUrl)
+      const order = await createCatalogCheckout(planKey);
+
+      const orderId = (order as any)?.orderId as string | undefined;
+      const checkoutUrl = (order as any)?.checkoutUrl as string | undefined;
+
+      if (!orderId) throw new Error("ORDER_ID_MISSING");
+      if (!checkoutUrl) throw new Error("CHECKOUT_URL_MISSING");
+
+      // 2) guardar contexto para continuar después del redirect
+      localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
+        productId,
+        planKey,
+        orderId,
+        title: draft.title,
+        phoneE164: draft.phoneE164,
+        phoneLocal: draft.phoneLocal,
+        amount: order.amount ?? priceToPay,
+        currency: order.currency ?? "MXN",
+        credits: order.credits ?? selectedPlan.credits,
+        daysValid: order.daysValid ?? selectedPlan.daysValid ?? 30,
+        createdAt: Date.now(),
+      }));
+
+      // 3) redirigir a Stripe
+      window.location.href = checkoutUrl;
+    } catch (err: any) {
+      const status = err?.status ?? err?.response?.status;
+      const msgRaw = String(err?.message ?? "");
+
+      if (status === 401) {
+        setPayErr("Tu sesión expiró. Vuelve a verificar tu número.");
+      } else if (msgRaw.includes("ORDER_ID_MISSING")) {
+        setPayErr("No pudimos iniciar el pago. Intenta nuevamente.");
+      } else if (msgRaw.includes("CHECKOUT_URL_MISSING")) {
+        setPayErr("No se pudo abrir el pago. Intenta nuevamente.");
+      } else {
+        setPayErr("No se pudo iniciar el pago. Intenta nuevamente.");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    // 1) crear checkout (order PENDING + checkoutUrl)
-    const order = await createCatalogCheckout(planKey);
-
-    const orderId = (order as any)?.orderId as string | undefined;
-    const checkoutUrl = (order as any)?.checkoutUrl as string | undefined;
-
-    if (!orderId) throw new Error("ORDER_ID_MISSING");
-    if (!checkoutUrl) throw new Error("CHECKOUT_URL_MISSING");
-
-    // 2) guardar contexto para continuar después del redirect
-localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
-  productId,
-  planKey,
-  orderId,
-  title: draft.title,
-  phoneE164: draft.phoneE164,
-  phoneLocal: draft.phoneLocal,
-  amount: order.amount ?? priceToPay,
-  currency: order.currency ?? "MXN",
-  credits: order.credits ?? selectedPlan.credits,
-  daysValid: order.daysValid ?? selectedPlan.daysValid ?? 30,
-  createdAt: Date.now(),
-}));
-
-    // 3) redirigir a Stripe
-    window.location.href = checkoutUrl;
-  } catch (err: any) {
-    const status = err?.status ?? err?.response?.status;
-    const msgRaw = String(err?.message ?? "");
-
-    if (status === 401) {
-      setPayErr("Tu sesión expiró. Vuelve a verificar tu número.");
-    } else if (msgRaw.includes("ORDER_ID_MISSING")) {
-      setPayErr("No pudimos iniciar el pago. Intenta nuevamente.");
-    } else if (msgRaw.includes("CHECKOUT_URL_MISSING")) {
-      setPayErr("No se pudo abrir el pago. Intenta nuevamente.");
-    } else {
-      setPayErr("No se pudo iniciar el pago. Intenta nuevamente.");
-    }
-  } finally {
-    setLoading(false);
   }
-}
 
   if (guardLoading) return null;
   if (!ok) return null;
@@ -430,50 +430,50 @@ localStorage.setItem("lokaly_pending_payment_v1", JSON.stringify({
                 const isActive = p.key === planKey;
                 const displayTitle = p.key === "PILOT" ? "Piloto (sin costo)" : p.title;
                 const bgStyle =
-  p.bg === "blueSoft"
-    ? {
-        cardBg: "rgba(37,99,235,0.06)",
-        badgeBg: "rgba(37,99,235,0.14)",
-        badgeBorder: "1px solid rgba(37,99,235,0.20)",
-      }
-    : p.bg === "amberSoft"
-    ? {
-        cardBg: "rgba(245,158,11,0.08)",
-        badgeBg: "rgba(245,158,11,0.18)",
-        badgeBorder: "1px solid rgba(245,158,11,0.30)",
-      }
-    : {
-        cardBg: "#fff",
-        badgeBg: "rgba(15,23,42,0.06)",
-        badgeBorder: "1px solid rgba(15,23,42,0.12)",
-      };
+                  p.bg === "blueSoft"
+                    ? {
+                      cardBg: "rgba(37,99,235,0.06)",
+                      badgeBg: "rgba(37,99,235,0.14)",
+                      badgeBorder: "1px solid rgba(37,99,235,0.20)",
+                    }
+                    : p.bg === "amberSoft"
+                      ? {
+                        cardBg: "rgba(245,158,11,0.08)",
+                        badgeBg: "rgba(245,158,11,0.18)",
+                        badgeBorder: "1px solid rgba(245,158,11,0.30)",
+                      }
+                      : {
+                        cardBg: "#fff",
+                        badgeBg: "rgba(15,23,42,0.06)",
+                        badgeBorder: "1px solid rgba(15,23,42,0.12)",
+                      };
 
-const badge =
-  p.key === "PILOT"
-    ? "🚀 Piloto"
-    : p.key === "PACK5"
-    ? "⭐ Más vendido"
-    : p.key === "PACK10"
-    ? "Recomendado"
-    : "";
+                const badge =
+                  p.key === "PILOT"
+                    ? "🚀 Piloto"
+                    : p.key === "PACK5"
+                      ? "⭐ Más vendido"
+                      : p.key === "PACK10"
+                        ? "Recomendado"
+                        : "";
 
-    const badgeStyle =
-  p.key === "PILOT"
-    ? {
-        background: "rgba(245,158,11,0.18)",
-        border: "1px solid rgba(245,158,11,0.35)",
-      }
-    : p.key === "PACK5"
-    ? {
-        background: "rgba(37,99,235,0.14)",
-        border: "1px solid rgba(37,99,235,0.25)",
-      }
-    : p.key === "PACK10"
-    ? {
-        background: "rgba(15,23,42,0.08)",
-        border: "1px solid rgba(15,23,42,0.18)",
-      }
-    : {};
+                const badgeStyle =
+                  p.key === "PILOT"
+                    ? {
+                      background: "rgba(245,158,11,0.18)",
+                      border: "1px solid rgba(245,158,11,0.35)",
+                    }
+                    : p.key === "PACK5"
+                      ? {
+                        background: "rgba(37,99,235,0.14)",
+                        border: "1px solid rgba(37,99,235,0.25)",
+                      }
+                      : p.key === "PACK10"
+                        ? {
+                          background: "rgba(15,23,42,0.08)",
+                          border: "1px solid rgba(15,23,42,0.18)",
+                        }
+                        : {};
                 return (
                   <button
                     key={p.key}
@@ -518,18 +518,18 @@ const badge =
                       </div>
                     </div>
 
-{p.key !== "PILOT" && savingsText(p) ? (
-  <div
-    style={{
-      marginTop: 8,
-      fontSize: 12,
-      fontWeight: 900,
-      color: "rgba(15,23,42,0.62)",
-    }}
-  >
-    {savingsText(p)}
-  </div>
-) : null}
+                    {p.key !== "PILOT" && savingsText(p) ? (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: "rgba(15,23,42,0.62)",
+                        }}
+                      >
+                        {savingsText(p)}
+                      </div>
+                    ) : null}
 
                     {p.key === "PACK5" ? (
                       <div
@@ -583,17 +583,17 @@ const badge =
               }}
             >
               {loading
-  ? "Procesando..."
-  : planKey === "PILOT"
-  ? "Activar piloto y publicar"
-  : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
+                ? "Procesando..."
+                : planKey === "PILOT"
+                  ? "Activar piloto y publicar"
+                  : `Pagar y publicar · ${formatMxMoney(priceToPay)}`}
             </button>
 
-<div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
-  {planKey === "PILOT"
-    ? "Piloto activo. No se te pedirá tarjeta."
-    : "Pago seguro. No cobramos comisión por venta."}
-</div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
+              {planKey === "PILOT"
+                ? "Piloto activo. No se te pedirá tarjeta."
+                : "Pago seguro. No cobramos comisión por venta."}
+            </div>
 
             <div style={{ marginTop: 8, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
               *Precio inicial por lanzamiento. Próximamente sube a $19.

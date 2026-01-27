@@ -149,7 +149,9 @@ function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* 🌐 Catálogo público */}
+        <Route path="/app/catalog/:slug" element={<PublicCatalogPage />} />
         <Route path="/catalog/:slug" element={<PublicCatalogPage />} />
+        <Route path="/c/:slug" element={<PublicCatalogPage />} />
 
         {/* 🌐 Detalle público de producto */}
         <Route path="/p/:productId" element={<PublicProductPage />} />
