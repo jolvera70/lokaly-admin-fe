@@ -1539,7 +1539,7 @@ return (
             </div>
 
             <button
-              onClick={() => navigate(`/catalog/${data.seller.slug}`)}
+              onClick={() => navigate(`/app/catalog/${data.seller.slug}`)}
               className="amzSellerBtn"
               disabled={!data.seller.slug}
               title={!data.seller.slug ? "Catálogo no disponible" : "Ver catálogo"}
