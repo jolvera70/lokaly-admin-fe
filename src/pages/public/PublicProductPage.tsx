@@ -1539,7 +1539,11 @@ return (
             </div>
 
             <button
-              onClick={() => navigate(`/app/catalog/${data.seller.slug}`)}
+              onClick={() => {
+  if (!data.seller.slug) return;
+  const url = `${window.location.origin}/app/catalog/${data.seller.slug}`;
+  window.location.assign(url);
+}}
               className="amzSellerBtn"
               disabled={!data.seller.slug}
               title={!data.seller.slug ? "Catálogo no disponible" : "Ver catálogo"}
