@@ -40,15 +40,6 @@ function planCreditsFallback(plan?: PlanKey) {
   return 1;
 }
 
-function buildWhatsAppShareLink(catalogUrl: string) {
-  const msg =
-    `¡Hola! \n` +
-    `Te comparto mi catálogo en Lokaly:\n` +
-    `${catalogUrl}\n\n` +
-    `Si te interesa algo, escríbeme por aquí.`;
-  return `https://wa.me/?text=${encodeURIComponent(msg)}`;
-}
-
 export default function PublishSuccessPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -108,11 +99,6 @@ export default function PublishSuccessPage() {
       alive = false;
     };
   }, [loading, ok, state.catalogUrl, navigate]);
-
-  const shareLink = useMemo(() => {
-    if (!catalogUrl) return "";
-    return buildWhatsAppShareLink(catalogUrl);
-  }, [catalogUrl]);
 
   const creditsPurchased = useMemo(() => {
     if (typeof state.credits === "number") return state.credits;
@@ -261,22 +247,6 @@ export default function PublishSuccessPage() {
                 <button className="lp__btn lp__btn--ghost" type="button" onClick={onCopy} style={{ flex: "1 1 180px" }}>
                   {copied ? "✅ Copiado" : "Copiar link"}
                 </button>
-
-                <a
-                  className="lp__btn lp__btn--primary"
-                  href={shareLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    textDecoration: "none",
-                    display: "inline-flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flex: "1 1 180px",
-                  }}
-                >
-                  Compartir por WhatsApp
-                </a>
               </div>
 
               <div style={{ marginTop: 10, fontSize: 12, color: "rgba(15,23,42,0.55)" }}>
