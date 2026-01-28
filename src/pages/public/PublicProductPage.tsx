@@ -999,14 +999,24 @@ export function PublicProductPage() {
     loadProduct();
   }, [loadProduct]);
 
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast("Link copiado ✅");
-    } catch {
-      alert("No se pudo copiar. Copia manual: " + window.location.href);
-    }
+async function copyLink() {
+  try {
+    const { origin, pathname } = window.location;
+
+    // Quita /app del path si existe
+    const cleanPath = pathname.startsWith("/app")
+      ? pathname.replace("/app", "")
+      : pathname;
+
+    const canonicalUrl = origin + cleanPath;
+
+    await navigator.clipboard.writeText(canonicalUrl);
+
+    toast("Link copiado ✅");
+  } catch {
+    alert("No se pudo copiar el link");
   }
+}
 
   const whatsappMessage = useMemo(() => {
     if (!data) return "";
