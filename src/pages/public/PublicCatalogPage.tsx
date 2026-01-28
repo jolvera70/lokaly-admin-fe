@@ -886,7 +886,7 @@ return (
                           },
                         });
 
-                        navigate(`/p/${p.id}`);
+                        navigate(`/app/p/${p.id}`);
                       }}
                       className="amz-cta"
                     >
